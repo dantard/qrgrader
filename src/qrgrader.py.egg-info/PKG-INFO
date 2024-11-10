@@ -1,3 +1,18 @@
+Metadata-Version: 2.1
+Name: qrgrader.py
+Version: 0.0.1
+Summary: The QRGRADER
+Home-page: https://github.com/dantard/qrgrader
+Author: Danilo Tardioli, Alejandro R. Mosteo
+Author-email: dantard@unizar.es
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+
 # qrgrader 
 This framework allows to generate multiple answers randomized exams and grade them.
 
@@ -156,3 +171,5 @@ Move to the qr workspace and type:
 $ ./qrgrader
 ```
 A Qt-based app will show up where you can modify the marks just clicking on the annotations shown in red or green. If multiple answers have been selected for the same question, all the annotation will be shown in yellow. You can click those that the student did not intend to mark to remove them.
+
+

@@ -1,0 +1,17 @@
+fonttools
+gspread
+opencv-python-headless
+pandas
+pydrive
+pyminizip
+pymupdf
+pyqt5
+pyyaml
+pyzbar
+zxing-cpp
+cryptography
+pyopenssl
+psutil
+asn1crypto
+pillow
+pylatexenc

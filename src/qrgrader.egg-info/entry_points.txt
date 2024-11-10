@@ -1,0 +1,5 @@
+[console_scripts]
+qrgenerator = qrgrader.qrgenerator:main
+qrgrader = qrgrader.qrgrader:main
+qrscanner = qrgrader.qrscanner:main
+qrworkspace = qrgrader.qrworkspace:main

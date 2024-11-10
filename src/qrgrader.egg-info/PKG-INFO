@@ -1,3 +1,33 @@
+Metadata-Version: 2.1
+Name: qrgrader
+Version: 0.0.1
+Summary: The QRGRADER
+Home-page: https://github.com/dantard/qrgrader
+Author: Danilo Tardioli, Alejandro R. Mosteo
+Author-email: dantard@unizar.es
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: fonttools
+Requires-Dist: gspread
+Requires-Dist: opencv-python-headless
+Requires-Dist: pandas
+Requires-Dist: pydrive
+Requires-Dist: pyminizip
+Requires-Dist: pymupdf
+Requires-Dist: pyqt5
+Requires-Dist: pyyaml
+Requires-Dist: pyzbar
+Requires-Dist: zxing-cpp
+Requires-Dist: cryptography
+Requires-Dist: pyopenssl
+Requires-Dist: psutil
+Requires-Dist: asn1crypto
+Requires-Dist: pillow
+Requires-Dist: pylatexenc
+
 # qrgrader 
 This framework allows to generate multiple answers randomized exams and grade them.
 
