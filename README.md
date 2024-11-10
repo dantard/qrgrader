@@ -1,6 +1,19 @@
 # qrgrader 
-This framework allows to generate multiple answers randomized exams and grade them.
+This framework allows generating multiple answers randomized exams and grade them.
 
+## Installation
+
+To install qrgrader clone the repository as (in a Linux machine):
+```
+git clone https://github.com/dantard/qrgrader.git
+```
+
+and then install the scripts:
+
+```
+cd qrgrader
+pip install .
+```
 
 ## qrworkspace ##
 
@@ -114,37 +127,17 @@ This flag can also be multiples times and with different values **after** the sc
 
 ## Google Drive ##
 
-In this section we will describe how to automatically upload the data generated to Google Drive and using them on Google Sheets. 
-This is still **in beta phase** and not open to general public. **Please let us know if you want to be beta tester**.
-
-
-The `qrscanner` script is also in charge of managing the uploading of the PDF and data to the Google Workspace. The `-U` flags will upload the `result/publish/*.pdf` (i.e. all the reconstructed files) to a Google Drive directory specified by the `uid` (which is the alphanumeric string that identifies a Google Drive directory). 
-
-Assuming a given Google Drive directory called for example `exam` has the address 
-```
-https://drive.google.com/drive/u/0/folders/1oQXGJ3yStnJ4ocY8moo1X5qZvViYDF3-
-```
-
-the command:
-
-```
-$ qrscanner -U 1oQXGJ3yStnJ4ocY8moo1X5qZvViYDF3-
-```
-will upload the cited files to the `exam` directory. The `-U` flag forces the `-l` flag that creates the table `results/xls/221215_pdf.csv` which contains the relationship between the exam number and the Google Drive PDF address. The `-l` flag can be also be used alone to obtain the `results/xls/221215_pdf.csv` file
-
 The `-W` flag allows specifying the Google Sheet Workbook where the data will be uploaded.
 
-Assuming there is a `qrgrader`-compatible workbook online called SAU2021-22 the command:
+Assuming there is a workbook online called SAU2021-22 the command:
 ```
 $ qrscanner -W SAU2021-22
 ```
 will:
 
-1. Copies the `master_raw` table into `221215_raw` table
-2. Fills the `221215_raw` table with the content of `221215_raw.csv`
-3. Creates a table called `221215_feedback` from the file `results/xls/221215_feedback.csv`
-4. Creates a table called `221215_nia` from the file `results/xls/221215_nia.csv`
-5. Creates a table called `221215_pdf` from the file `results/xls/221215_pdf.csv`
+1. Creates a table called `221215_raw` table with the content of `results/xls/221215_raw.csv`
+2. Creates a table called `221215_feedback` from the file `results/xls/221215_feedback.csv`
+3. Creates a table called `221215_nia` from the file `results/xls/221215_nia.csv`
 
 
 ## qrgrader ##
@@ -153,6 +146,6 @@ To visualize the exams and being able to correct the mistakes that could have be
 Move to the qr workspace and type:
 
 ```
-$ ./qrgrader
+$ qrgrader
 ```
 A Qt-based app will show up where you can modify the marks just clicking on the annotations shown in red or green. If multiple answers have been selected for the same question, all the annotation will be shown in yellow. You can click those that the student did not intend to mark to remove them.

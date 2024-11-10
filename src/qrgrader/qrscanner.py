@@ -1153,42 +1153,7 @@ def main():
             tables = [f for f in tables if table_to_upload in f]
 
         for table in tables:
-            if "_raw" in table:
-                # GRADES
-                try:
-                    df = pd.read_csv(dir_xls + os.sep + table + ".fix", sep=',', header=None, dtype=object)
-                    print("Reading " + dir_xls + os.sep + table + ".fix")
-                except:
-                    try:
-                        df = pd.read_csv(dir_xls + os.sep + table + ".csv", sep=',', header=None, dtype=object)
-                        print("Reading " + dir_xls + os.sep + table + ".csv")
-                    except:
-                        print("ERROR: No RAW table present, exiting.")
-                        sys.exit(1)
-
-                try:
-                    ws = sh.worksheet(table)
-                    ok = yes or ask_user("INFO: Table '{}' exists. Overwrite (y/n)?".format(table))
-                except:
-                    worksheet_list = sh.worksheets()
-                    gid = -1
-                    count = 0
-                    for sheet in worksheet_list:
-                        count = count + 1
-                        if sheet.title == "master_raw":
-                            gid = sheet.id
-                    print("STEP: Duplicating 'master_raw' with gid {}".format(gid))
-                    if gid != -1:
-                        ws = sh.duplicate_sheet(gid, insert_sheet_index=count, new_sheet_name=date + "_raw")
-                        ok = True
-                    else:
-                        print("WARNING: Unable to find table 'master_raw', skipping!")
-                        ok = False
-
-                if ok:
-                    print("STEP: Uploading table '{}'".format(table))
-                    pandas_to_sheets(df, ws, corner='G8')
-            elif "_questions" in table:
+            if "_questions" in table:
                 upload_table(table, sep="\t")
             else:
                 upload_table(table)

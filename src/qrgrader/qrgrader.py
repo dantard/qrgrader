@@ -683,7 +683,6 @@ class MainWindow(QMainWindow):
         return False
 
     def show_problematic_questions(self, exam_id):
-        print("show_problematic_questions", exam_id)
 
         questions = self.problematic_exams.get(exam_id)
 
