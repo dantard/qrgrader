@@ -1,6 +1,18 @@
 # qrgrader 
 This framework allows generating multiple answers randomized exams and grade them.
 
+## Overview
+qrgrader is an innovative framework designed for generating and grading exams using 2D barcodes, specifically QR codes. This approach allows for the creation of multiple randomized versions of exams and provides an automated grading process. The primary goal is to streamline the examination process, making it more efficient and less prone to human error.
+
+Key Features:
+- Randomized Exam Generation: Easily create multiple versions of exams with randomized questions.
+- Automated Grading: Scan completed exams and automatically grade them using QR codes embedded in the exam papers.
+- Integration with LaTeX: Utilize LaTeX for formatting and generating exam documents.
+- Google Drive Integration: Upload and manage exam results directly in Google Sheets for easy access and sharing.
+- Interactive Grading Tool: Use a Qt-based application to manually review and adjust grades if necessary.
+The framework includes several command-line tools (qrworkspace, qrgenerator, qrscanner, and qrgrader) to facilitate the entire process from exam creation to grading and result management.
+
+
 ## Installation
 
 To install qrgrader clone the repository as (in a Linux machine):
