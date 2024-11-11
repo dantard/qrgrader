@@ -213,21 +213,27 @@ def main():
             pdf_page = 0  # was 1 before merging (commented lines below)
             f = open(source_pool + os.sep + f, "r")
             for line in f:
-                if "QRPOSE" in line:
-                    line = line.replace("\zref@newlabel{QRPOSE,", "") \
-                        .replace("}{\posx{", ",") \
-                        .replace("}\posy{", ",") \
-                        .replace("}\\abspage{", ",").replace("}}", "").strip()
+                if line.startswith("\zref@newlabel{QRPOSE"):
+                    words_with_numbers = re.findall(r'\b\w*\d\w*\b', line)
+                    if len(words_with_numbers) != 5:
+                        print("ERROR: QRPOSE line does not have 5 values: {}".format(line))
+                        sys.exit(0)
+                    else:
+                        # line = line.replace("\zref@newlabel{QRPOSE,", "") \
+                        #     .replace("}{\posx{", ",") \
+                        #     .replace("}\posy{", ",") \
+                        #     .replace("}\\abspage{", ",").replace("}}", "").strip()
+                        qr_data, posx, posy, abs_page, page_value = words_with_numbers
 
-                    if line.startswith("P"):
-                        pdf_page += 1
+                        if qr_data.startswith("P"):
+                            pdf_page += 1
 
-                    params = line.split(sep=",")
-                    line = "{},{},{},{},{},{},{}\n".format(params[0], params[1], params[2], 0, 0, params[3], pdf_page)
+                        params = line.split(sep=",")
+                        line = "{},{},{},{},{},{},{}\n".format(qr_data, posx, posy, 0, 0, abs_page, pdf_page)
 
-                    # if line.startswith("P"):
-                    #    pdf_page += 1
-                    w.write(line)
+                        # if line.startswith("P"):
+                        #    pdf_page += 1
+                        w.write(line)
             f.close()
         w.close()
 
@@ -285,7 +291,7 @@ def main():
                             line = log[i].replace("\n", "").replace("\t", "")
                             fields = line.split(";;")
                             fields = [f for f in fields if f != ""]
-                            if len(fields) > 9:
+                            if len(fields) == 5:
 
                                 if fields[0] in questions_number:
                                     print("\n****************************************************")
@@ -299,12 +305,12 @@ def main():
                                        "\t" + (fields[3] if fields[2] == "b" else "0") + \
                                        "\t" + (fields[3] if fields[2] == "c" else "0") + \
                                        "\t" + (fields[3] if fields[2] == "d" else "0") + \
-                                       "\t" + fields[4] + \
-                                       "\t" + LatexNodes2Text().latex_to_text(fields[5]).replace("\t", "").replace("\n", " ") + \
-                                       "\t" + LatexNodes2Text().latex_to_text(fields[6]).replace("\t", "").replace("\n", " ") + \
-                                       "\t" + LatexNodes2Text().latex_to_text(fields[7]).replace("\t", "").replace("\n", " ") + \
-                                       "\t" + LatexNodes2Text().latex_to_text(fields[8]).replace("\t", "").replace("\n", " ") + \
-                                       "\t" + LatexNodes2Text().latex_to_text(fields[9]).replace("\t", "").replace("\n", " ")
+                                       "\t" + fields[4]
+                                       #"\t" + LatexNodes2Text().latex_to_text(fields[5]).replace("\t", "").replace("\n", " ") + \
+                                       #"\t" + LatexNodes2Text().latex_to_text(fields[6]).replace("\t", "").replace("\n", " ") + \
+                                       #"\t" + LatexNodes2Text().latex_to_text(fields[7]).replace("\t", "").replace("\n", " ") + \
+                                       #"\t" + LatexNodes2Text().latex_to_text(fields[8]).replace("\t", "").replace("\n", " ") + \
+                                       #"\t" + LatexNodes2Text().latex_to_text(fields[9]).replace("\t", "").replace("\n", " ")
                                 data += line + "\n"
                         filew.write(data)
 
