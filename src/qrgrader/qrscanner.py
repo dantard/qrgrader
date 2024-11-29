@@ -462,7 +462,7 @@ def main():
 
 
     allnative = None
-
+    allcodes, allseen = [], []
 
     class Scanner(threading.Thread):
         def __init__(self, img, pdf_page):
@@ -472,7 +472,7 @@ def main():
 
         def run(self):
 
-            global allcodes
+            #global allcodes
             try:
                 date, exam, page, codes = scan_page(self.im, use_zxing, use_zbar, use_debug, debug_path, pool_dir, ppm,
                                                     size_mm, verbose, tolerance, thresholds, self.pdf_page, allnative)
@@ -563,7 +563,7 @@ def main():
         annotations = "answers"
         use_zxing = True
 
-    allcodes, allseen = [], []
+
 
     if process:
         if filename is None:
