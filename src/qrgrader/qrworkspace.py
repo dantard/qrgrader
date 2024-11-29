@@ -1,45 +1,43 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
-
 import argparse
-from datetime import date as thedate
+import os
+from datetime import date
 
-from qrgrader.python.support import *
+from qrgrader.common import get_workspace_paths
+
+import importlib.resources
+
+
+def get_resource(name):
+    with importlib.resources.files("qrgrader").joinpath("latex" + os.sep + name).open("r", encoding='utf-8') as f:
+        return f.read()
+
 
 def main():
-
-    parser = argparse.ArgumentParser(description='Patching and detection')
-    parser.add_argument('-d', '--date', help='Examen id code (usually da date, 6 figures)', default=None)
-
+    parser = argparse.ArgumentParser()
+    today = date.today().strftime("%y%m%d")
+    parser.add_argument('-d', '--date', type=int, help='Date', default=today)
     args = vars(parser.parse_args())
 
-    date = args["date"]
+    if args["date"] < 100000 or args["date"] > 999999:
+        print("Invalid date value, exiting.")
+        exit(1)
 
-    if date is None:
-        date = thedate.today().strftime("%y%m%d")
+    directories = get_workspace_paths(os.getcwd() + os.sep + "qrgrading-" + str(args["date"]))
 
-    base = "qrgrading-{}".format(date)
-    pool = base + "/generated/pdf"
-    qrs = base + "/generated/qr"
-    xls = base + "/results/xls"
-    publish = base + "/results/publish"
-    scanned = base + "/scanned"
-    source = base + "/source"
+    for directory in directories:
+        if not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
 
-    makedir(base, False)
-    makedir(pool, False)
-    makedir(qrs, False)
-    makedir(xls, False)
-    makedir(publish, False)
-    makedir(scanned, False)
-    makedir(source, False)
+    dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source = directories
 
-    with open(base + os.sep + ".date", "w") as f:
-        f.write("{}".format(date))
+    with open(dir_source + "main.tex", "w", encoding='utf-8') as f:
+        f.write(get_resource("main.tex"))
 
-    print("Workspace '{}' has been created correctly.".format(base))
+    with open(dir_source + "qrgrader.sty", "w", encoding='utf-8') as f:
+        f.write(get_resource("qrgrader.sty"))
+
+    print(f"Workspace qrgrader-{args['date']} created successfully.")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -1,0 +1,754 @@
+% (c) 2017 Rolling Cat Software
+%
+%% This program can be redistributed and/or modified under the terms
+%% of the LaTeX Project Public License Distributed from CTAN archives
+%% in directory macros/latex/base/lppl.txt.
+% 
+\NeedsTeXFormat{LaTeX2e}[1994/06/01]
+\ProvidesPackage{qrgrader}
+[2011/01/11 v0.01 LaTeX package for automatically grading exams]
+\RequirePackage{readarray}
+\RequirePackage{datatool}
+\RequirePackage{tikz}
+\RequirePackage{tabularx}
+\RequirePackage{etoolbox}
+\RequirePackage{xstring}
+\RequirePackage{fmtcount}% http://ctan.org/pkg/fmtcount
+\RequirePackage{xargs}
+\RequirePackage{xparse}
+\RequirePackage{mwe}
+\RequirePackage[export]{adjustbox}
+\RequirePackage{tabulary}
+\RequirePackage{keycommand}
+\RequirePackage{etoolbox}
+\RequirePackage{pgffor}
+\RequirePackage{kvoptions}
+\RequirePackage{hyperref}
+\RequirePackage{xstring}
+\RequirePackage{zref-abspos}
+\RequirePackage{zref-user}
+\RequirePackage{amssymb}
+\RequirePackage{listofitems}
+%\RequirePackage{savetrees}
+\RequirePackage[breakable]{tcolorbox}
+\RequirePackage{pst-barcode}
+\RequirePackage{fancyhdr}
+\RequirePackage[left=19mm, right=19mm, top=20mm, bottom=20mm]{geometry}
+
+% RELATIVE SIZE OF AZTECS vs original default size
+\newcommand{\barsize}{1} % en teoría hasta 0.5 debería ser safe
+
+%% Param \isdraft %%
+\newcommand{\isdraft}{}
+\DeclareOption{draft}{\renewcommand{\isdraft}{draft}}
+
+%% Type qr or aztec %%
+\newcommand{\type}{0}
+\DeclareOption{qr}{\renewcommand{\type}{0}}
+\DeclareOption{aztec}{\renewcommand{\type}{1}}
+
+%% QR code width %%
+\newcommand{\qrwidth}{0.7cm}
+\DeclareOption{small}{\renewcommand{\qrwidth}{0.5cm}}
+\DeclareOption{medium}{\renewcommand{\qrwidth}{0.7cm}}
+\DeclareOption{large}{\renewcommand{\qrwidth}{0.9cm}}
+
+% QR redundance %%
+\newcommand{\redundance}{H}
+\DeclareOption{H}{\renewcommand{\redundance}{H}}
+\DeclareOption{L}{\renewcommand{\redundance}{L}}
+\DeclareOption{M}{\renewcommand{\redundance}{M}}
+
+%% Process the options %%
+\ProcessOptions\relax
+
+%% Require package qrcode after setting \isdraft %%
+\ifcsdef{draftoverride}{\renewcommand{\isdraft}{\draftoverride}}{}
+\RequirePackage[\isdraft]{qrcode}
+\RequirePackage[]{setspace}
+
+\def\hi{This is the qrgrader package}
+\let\myDate\date
+\def\restofpage{\dimexpr\pagegoal-\pagetotal-\baselineskip\relax}
+
+% Collect parameters
+\ifcsdef{uniqueid}{}{\newcommand{\uniqueid}{190822079}}
+\newcommand{\qstyle}{2}
+
+\newcommand{\toint}[1]{\the\numexpr #1 \relax}
+
+% Set QR type to use
+\ifnum\pdfstrcmp{\type}{0}=0
+    %QRCODE
+    \newcommand\matcode[1]{
+        \wlog{MATCODE:#1}
+        \IfBeginWith{#1}{\#}{}
+        {\zsavepos{QRPOSE,#1}}
+        \qrcode[height=\qrwidth,level=\redundance, version=2]{#1}
+    }
+\else
+    %AZTEC
+    \ifnum\pdfstrcmp{\isdraft}{draft}=0
+        % WITH SCALING
+        %\newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\scalebox{\barsize}{\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\end{pspicture}}}
+        % WITHOUT SCALING
+        \newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\end{pspicture}}
+    \else
+        % WITH SCALING
+        %\newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\scalebox{\barsize}{\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\psbarcode[transx=-0.3cm,transy=-0.3cm]{#1}{includetext width=0.3 height=0.3 }{azteccode}\end{pspicture}}}
+        % WITHOUT SCALING
+        \newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\psbarcode[transx=-0.3cm,transy=-0.3cm]{#1}{includetext width=0.3 height=0.3  }{azteccode}\end{pspicture}}
+    \fi
+\fi
+
+\newcommand{\mymessage}[1]{\bgroup \typeout{\detokenize{#1}}\egroup}
+
+% REDEFINE \ifcommandkey because of a bug in the implementation
+\begingroup
+  \makeatletter
+  \catcode`\/=8 %
+  \@firstofone
+    {
+      \endgroup
+      \renewcommand{\ifcommandkey}[1]{%
+        \csname @\expandafter \expandafter \expandafter
+        \expandafter \expandafter \expandafter  \expandafter
+        \kcmd@nbk \commandkey {#1}//{first}{second}//oftwo\endcsname
+      }
+   }
+
+\def\data
+{5 6 7 8
+5 6 8 7
+5 7 6 8
+5 7 8 6
+5 8 6 7
+5 8 7 6
+6 5 7 8
+6 5 8 7
+6 7 5 8
+6 7 8 5
+6 8 5 7
+6 8 7 5
+7 5 6 8
+7 5 8 6
+7 6 5 8
+7 6 8 5
+7 8 5 6
+7 8 6 5
+8 5 6 7
+8 5 7 6
+8 6 5 7
+8 6 7 5
+8 7 5 6
+8 7 6 5
+5 6 7 8
+5 6 8 7
+5 7 6 8
+5 7 8 6
+5 8 6 7
+5 8 7 6
+6 5 7 8
+6 5 8 7
+6 7 5 8
+6 7 8 5
+6 8 5 7
+6 8 7 5
+7 5 6 8
+7 5 8 6
+7 6 5 8
+7 6 8 5
+7 8 5 6
+7 8 6 5
+8 5 6 7
+8 5 7 6
+8 6 5 7
+8 6 7 5
+8 7 5 6
+8 7 6 5}
+
+\readarray\data\permut[24,4]
+
+\newcounter{qn}
+\setcounter{qn}{1}
+
+
+%GENERIC QUESTION
+\newkeycommand*\question
+[score=, penalty=, brief=, enum correct={a,b,c,d}, style={default,list,matrix,redundant,open,horizontal}][6]
+{
+    \pgfmathparse{random(1000,9999)}
+    \DTLnewrow{list}%
+    \DTLnewdbentry{list}{id}{#1}%
+    %\dtlexpandnewvalue
+    \DTLnewdbentry{list}{label}{{\setstretch{1.15}#2}}%
+    \DTLnewdbentry{list}{qa}{#3}%
+    \DTLnewdbentry{list}{qb}{#4}%
+    \DTLnewdbentry{list}{qc}{#5}%
+    \DTLnewdbentry{list}{qd}{#6}%
+    \DTLnewdbentry{list}{ok}{0}%
+    \DTLnewdbentry{list}{appendix}{}
+    \dtlexpandnewvalue
+        \DTLnewdbentry{list}{correct}{\commandkey{correct}}%
+        \DTLnewdbentry{list}{score}{\ifcommandkey{score}%{\textbf{($+$\commandkey{score}\hspace{-0.25em}}}{}
+        {\textbf{($+$\commandkey{score}}}{}
+        %\ifcommandkey{penalty}{\textbf{|$-$\commandkey{penalty})}}{\textbf{)}}
+        \ifcommandkey{penalty}{\textbf{|$-$\commandkey{penalty}\hspace{0.00em})}} {\textbf{)}} %0.55em
+        }%
+        \DTLnewdbentry{list}{style}{\commandkey{style}}
+        \DTLnewdbentry{list}{value}{\the\numexpr\pgfmathresult*1\relax}
+    \dtlnoexpandnewvalue
+
+    \typeout{;;;#1;;Q;;\commandkey{correct};;\ifcommandkey{score}{\commandkey{score}}{0};;\ifcommandkey{penalty}{-\commandkey{penalty}}{0};;\ifcommandkey{brief}{\commandkey{brief}}{Empty};;;}
+
+
+%    \mymessage{#2;;#3;;#4;;#5;;#6;;;}
+
+    \expandafter\xdef\csname rnd #1\endcsname{\the\numexpr\pgfmathresult*1\relax}
+}
+
+
+%DYNAMICQUESTION
+
+\newcommand{\dynamicquestion}[4]{
+    \input{dynamic_questions/dynamic_question_#2_#1.tex}
+}
+
+%DEVELQUESTION
+\newkeycommand*\develquestion
+[score=, brief=, style={default,list,matrix,redundant,open,horizontal}][3]
+{
+        \pgfmathparse{random(99999,99999)}
+        \DTLnewrow{list}%
+        \DTLnewdbentry{list}{id}{#1}%
+        \DTLnewdbentry{list}{qa}{#2}%
+        \DTLnewdbentry{list}{qb}{#2}%
+        \DTLnewdbentry{list}{qc}{#2}%
+        \DTLnewdbentry{list}{qd}{#2}%
+        \DTLnewdbentry{list}{ok}{0}%
+        \DTLnewdbentry{list}{label}{#3}%
+        \dtlexpandnewvalue
+
+            \DTLnewdbentry{list}{score}{\ifcommandkey{score}{\textbf{(+\commandkey{score})~}}{}}%
+            \DTLnewdbentry{list}{style}{devel}
+            \DTLnewdbentry{list}{value}{\the\numexpr\pgfmathresult*1\relax}
+            \DTLnewdbentry{list}{appendix}{}
+        \dtlnoexpandnewvalue
+
+        \typeout{;;;#1;;O;;a;;\ifcommandkey{score}{\commandkey{score}}{0};;0;;\ifcommandkey{brief}{\commandkey{brief}}{Empty};;;}
+%        \mymessage{#3;;#2;;None;;None;;None;;;}
+
+        \expandafter\xdef\csname rnd #1\endcsname{\the\numexpr\pgfmathresult*1\relax}
+}
+
+
+
+\newkeycommand*\emptypage
+[brief=][2]
+{
+        \pgfmathparse{random(99999,99999)}
+        \DTLnewrow{list}%
+        \DTLnewdbentry{list}{id}{#1}%
+        \DTLnewdbentry{list}{label}{#2}%
+        \dtlexpandnewvalue
+            \DTLnewdbentry{list}{style}{empty}
+            \DTLnewdbentry{list}{value}{\the\numexpr\pgfmathresult*1\relax}
+        \dtlnoexpandnewvalue
+        \expandafter\xdef\csname rnd \theqn\endcsname{\the\numexpr\pgfmathresult*1\relax}
+}
+
+\newcounter{cnt}
+
+\newcommand{\insertdb}[2]
+{
+        \pgfmathparse{random(10,99)}
+        \edef\myvar{\pgfmathresult}
+        \DTLnewrow{opti}%
+        \DTLnewdbentry{opti}{label}{#1}%
+        \DTLnewdbentry{opti}{answ}{#2}
+        \dtlexpandnewvalue
+        \DTLnewdbentry{opti}{id}{\myvar}%
+        \dtlnoexpandnewvalue
+}
+
+\newkeyenvironment*{exam}[enum style={default,list,matrix,redundant,horizontal}, enum shuffle={all,questions,answers, off, no, none}, first=1, newpage=100, enum showcorrect={no, yes}, enum encode={no, yes}, showorig={no, yes}]
+{
+        \DTLifdbexists{list}{\DTLcleardb{list}}{\DTLnewdb{list}}%
+        \pgfmathsetseed{\uniqueid}
+}
+{       %%% DO NOT leave empty lines in this macro, it will fail to comiple
+        %
+        %  Shuffle questions (sort actually shuffles because of random values) if shuffle is required
+        %
+        %
+        \ifnum\pdfstrcmp{\commandkey{shuffle}}{all}=0
+                \DTLsort*{value}{list}
+        \else
+                \ifnum\pdfstrcmp{\commandkey{shuffle}}{questions}=0
+                        \DTLsort*{value}{list}
+                \fi
+        \fi
+        %
+        %  Begin enumerate environment
+        %
+        \newcommand\np{0}
+        %
+        \begin{enumerate}
+                %
+                %  For each question in the database 'list'
+                %
+                \setcounter{cnt}{0}
+                %
+                %%% \vfill
+                %
+                \DTLforeach*{list}{\theLabel=label,\theQA=qa,\theQB=qb,\theQC=qc,\theQD=qd, \theValue=value, \theIdOrig=id, \theOK=ok, \theStyle=style,
+                \theCorrect=correct, \theAppendix=appendix, \theScore=score}{
+                        %%
+                        % Sums first parameter to \theIdOrig -> replace theIdOrig with theId for previous behavior
+                        %%
+                        \def\theId{\the\numexpr\theIdOrig+\commandkey{first}-1\relax}
+                        %%
+                        % Add new page if newpage specified
+                        %%
+                        \stepcounter{cnt}
+                        \ifnum\value{cnt}>\commandkey{newpage}
+                            \setcounter{cnt}{1}
+                            \newpage
+                        \fi
+                        %%
+                        % Set checkmarks if requested
+                        %%
+                        \ifthenelse{\equal{\commandkey{showcorrect}}{yes}}{
+                            \def \checkmarka {\ifthenelse{\equal{\theCorrect}{a}}{~\checkmark}{}}
+                            \def \checkmarkb {\ifthenelse{\equal{\theCorrect}{b}}{~\checkmark}{}}
+                            \def \checkmarkc {\ifthenelse{\equal{\theCorrect}{c}}{~\checkmark}{}}
+                            \def \checkmarkd {\ifthenelse{\equal{\theCorrect}{d}}{~\checkmark}{}}
+                        }{
+                            \def \checkmarka{}
+                            \def \checkmarkb{}
+                            \def \checkmarkc{}
+                            \def \checkmarkd{}
+                        }
+                        %%
+                        % Create 'opti' database and insert data for answers
+                        %%
+                        \DTLifdbexists{opti}{\DTLcleardb{opti}}{\DTLnewdb{opti}}
+                        \insertdb{\theQA\checkmarka}{1}
+                        \insertdb{\theQB\checkmarkb}{2}
+                        \insertdb{\theQC\checkmarkc}{3}
+                        \insertdb{\theQD\checkmarkd}{4}
+                        %%
+                        % Shuffle answer (sort is shuffling because of random values) if shuffle is requires
+                        %%
+                        \ifnum\pdfstrcmp{\commandkey{shuffle}}{all}=0
+                                \DTLsort*{id}{opti}
+                        \else
+                                \ifnum\pdfstrcmp{\commandkey{shuffle}}{answers}=0
+                                        \DTLsort*{id}{opti}
+                                \fi
+                        \fi
+                        %%
+                        \ifnum\pdfstrcmp{\theStyle}{open}=0
+                            \newpage
+                        \fi
+                        %%
+                        %\ifnum\np=5
+                        %    \newpage
+                        %    \begin{center}
+                        %        USE ESTA PÁGINA PARA sLOS CÁLCULOS DEL EJERCICIO PRECEDENTE\\
+                        %    \end{center}
+                        %\fi
+                        %%
+                        \ifnum\pdfstrcmp{\theStyle}{devel}=0
+                            \newpage
+                        \fi
+                        \ifnum\pdfstrcmp{\theStyle}{empty}=0
+                            \newpage
+                        \fi
+                        %%
+                        \DTLgetvalue{\enuna}{opti}{1}{1}
+                        \DTLgetvalue{\enunb}{opti}{2}{1}
+                        \DTLgetvalue{\enunc}{opti}{3}{1}
+                        \DTLgetvalue{\enund}{opti}{4}{1}
+                        %%
+                        \DTLgetvalue{\opta}{opti}{1}{2}
+                        \DTLgetvalue{\optb}{opti}{2}{2}
+                        \DTLgetvalue{\optc}{opti}{3}{2}
+                        \DTLgetvalue{\optd}{opti}{4}{2}
+                        %%
+                        \ifnum\pdfstrcmp{\commandkey{encode}}{yes}=0
+                            \DTLgetvalue{\optaa}{opti}{1}{2}
+                            \renewcommand{\opta}{\permut[\theId,\toint{\optaa}]}
+                            \DTLgetvalue{\optbb}{opti}{2}{2}
+                            \renewcommand{\optb}{\permut[\theId,\toint{\optbb}]}
+                            \DTLgetvalue{\optcc}{opti}{3}{2}
+                            \renewcommand{\optc}{\permut[\theId,\toint{\optcc}]}
+                            \DTLgetvalue{\optdd}{opti}{4}{2}
+                            \renewcommand{\optd}{\permut[\theId,\toint{\optdd}]}
+                        \fi
+                        %% \vfill %\hspace{-0.5cm}
+                        \vbox{
+                                %
+                                %%% Exam style (overrides general)
+                                %
+                                \ifnum\pdfstrcmp{\commandkey{style}}{matrix}=0
+                                        \renewcommand{\qstyle}{0}
+                                \fi
+                                \ifnum\pdfstrcmp{\commandkey{style}}{redundant}=0
+                                        \renewcommand{\qstyle}{1}
+                                \fi
+                                \ifnum\pdfstrcmp{\commandkey{style}}{list}=0
+                                        \renewcommand{\qstyle}{2}
+                                \fi
+                                \ifnum\pdfstrcmp{\commandkey{style}}{horizontal}=0
+                                        \renewcommand{\qstyle}{4}
+                                \fi
+                                %%
+                                % Question style (overrides general and per-exams)
+                                %%
+                                \ifnum\pdfstrcmp{\theStyle}{matrix}=0
+                                        \renewcommand{\qstyle}{0}
+                                \fi
+                                \ifnum\pdfstrcmp{\theStyle}{redundant}=0
+                                        \renewcommand{\qstyle}{1}
+                                \fi
+                                \ifnum\pdfstrcmp{\theStyle}{list}=0
+                                        \renewcommand{\qstyle}{2}
+                                \fi
+                                \ifnum\pdfstrcmp{\theStyle}{open}=0
+                                        \renewcommand{\qstyle}{3}
+                                \fi
+                                \ifnum\pdfstrcmp{\theStyle}{horizontal}=0
+                                        \renewcommand{\qstyle}{4}
+                                \fi
+                                \ifnum\pdfstrcmp{\theStyle}{devel}=0
+                                        \renewcommand{\qstyle}{5}
+                                \fi
+                                \ifnum\pdfstrcmp{\theStyle}{empty}=0
+                                        \renewcommand{\qstyle}{6}
+                                \fi
+                                %%
+                                % qstyle = 0 -> matrix
+                                %%
+                                \ifnum\pdfstrcmp{\qstyle}{0}=0
+                                        %%
+                                        %% QUESTION
+                                        %%
+                                        \item \theScore \theLabel \theAppendix\\% \opta~\optb~\optc~\optd~/~\theId\\
+                                        %%
+                                        \setlength{\extrarowheight}{0.45cm}
+                                        %%
+                                        %% ANSWERS
+                                        %%
+                                        \begin{tabular}{m{1mm} m{\qrwidth} m{0.4\columnwidth} m{1mm} m{\qrwidth} m{0.4\columnwidth}}
+                                                %%
+                                                \adjustbox{valign=m}{a)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode {\uniqueid\two@digits{\theId}\opta}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[t]{7cm}\enuna\end{minipage}} &
+                                                %%%%
+                                                \adjustbox{valign=m}{b)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optb}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[t]{7cm}\enunb\end{minipage}}\\
+                                                %%%%
+                                                \adjustbox{valign=m}{c)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optc}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[t]{7cm}\enunc\end{minipage}} &
+                                                %%%%
+                                                \adjustbox{valign=m}{d)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optd}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[t]{7cm}\enund\end{minipage}}\\
+                                                %%%%
+                                        \end{tabular}
+                                        \vspace{2.5mm}
+                                        %% \vfill
+                                \fi
+                                %%
+                                % qstyle = 2 -> list
+                                %%
+                                \ifnum\pdfstrcmp{\qstyle}{2}=0
+                                        %%
+                                        %% QUESTION
+                                        %%
+                                        \item \theScore \theLabel \theAppendix \\[10pt]
+                                        %%
+                                        \setlength{\extrarowheight}{0.25cm}
+                                        %%
+                                        %% ANSWERS
+                                        %%
+                                        \begin{tabular}{m{1mm} m{\qrwidth} m{0.8\columnwidth}}
+                                                %%
+                                                \adjustbox{valign=m}{a)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\opta}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[t]{0.8\columnwidth}\enuna \end{minipage}} \\[10pt]
+                                                %%%
+                                                \adjustbox{valign=m}{b)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optb}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[t]{0.8\columnwidth}\enunb\end{minipage}} \\[10pt]
+                                                %%%
+                                                \adjustbox{valign=m}{c)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optc}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[t]{0.8\columnwidth}\enunc\end{minipage}} \\[10pt]
+                                                %%%
+                                                \adjustbox{valign=m}{d)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optd}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[t]{0.8\columnwidth}\enund\end{minipage}} \\[10pt]
+                                                %%%%
+                                        \end{tabular}
+                                        \vspace{10mm}
+                                \fi
+                                %%
+                                % qstyle = 3 -> open
+                                %%
+                                \ifnum\pdfstrcmp{\qstyle}{3}=0
+                                        %%
+                                        %% QUESTION
+                                        %%
+                                        \item \theScore \theLabel \theAppendix \\
+                                        %%
+                                        \setlength{\extrarowheight}{0.25cm}
+                                        %%
+                                        %% ANSWERS
+                                        %%
+                                        \begin{center}
+                                            \framebox{
+                                            \begin{tabular}{ l c c c c c c c c}
+                                                    %%
+                                                    %% SCORE %% Here theQA is used to contain the number of the second question
+                                                    \parbox[u]{3.2cm}{Reservado profesores\\No marque ningún QR} &
+                                                    \framebox{\matcode{\uniqueid\two@digits{\theId}1}} &
+                                                    \framebox{\matcode{\uniqueid\two@digits{\theId}2}} &
+                                                    \framebox{\matcode{\uniqueid\two@digits{\theId}3}} &
+                                                    \framebox{\matcode{\uniqueid\two@digits{\theId}4}} &
+                                                    \framebox{\matcode{\uniqueid\two@digits{\theQA}1}} &
+                                                    \framebox{\matcode{\uniqueid\two@digits{\theQA}2}} &
+                                                    \framebox{\matcode{\uniqueid\two@digits{\theQA}3}} &
+                                                    \framebox{\matcode{\uniqueid\two@digits{\theQA}4}}
+                                                    %%%%
+                                            \end{tabular}
+                                        }
+                                        \end{center}
+                                \fi
+                                %%
+                                % qstyle = 4 -> horizontal
+                                %%
+                                \ifnum\pdfstrcmp{\qstyle}{4}=0
+                                        %%
+                                        %% QUESTION
+                                        %%
+                                        \item \theScore \theLabel \theAppendix\\
+                                        %%
+                                        \setlength{\extrarowheight}{0.45cm}
+                                        %%
+                                        %% ANSWERS
+                                        %%
+                                        \begin{tabular}{m{1mm} m{\qrwidth} m{0.15\columnwidth} m{1mm} m{\qrwidth} m{0.15\columnwidth} m{1mm} m{\qrwidth} m{0.15\columnwidth} m{1mm} m{\qrwidth} m{0.15\columnwidth}}
+                                                %%
+                                                \adjustbox{valign=m}{a)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode {\uniqueid\two@digits{\theId}\opta}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[m]{2.8cm}\enuna\end{minipage}} &
+                                                %%%%
+                                                \adjustbox{valign=m}{b)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optb}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[m]{2.8cm}\enunb\end{minipage}} &
+                                                %%%%
+                                                \adjustbox{valign=m}{c)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optc}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[m]{2.8cm}\enunc\end{minipage}} &
+                                                %%%%
+                                                \adjustbox{valign=m}{d)} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optd}}} &
+                                                \adjustbox{valign=m}{\begin{minipage}[m]{2.8cm}\enund\end{minipage}}\\
+                                                %%%%
+                                        \end{tabular}
+                                        \vspace{2.5mm}
+                                        %\vfill
+                                \fi
+                                %%
+                                %% qstyle = 5 -> devel
+                                %%
+                                \ifnum\pdfstrcmp{\qstyle}{5}=0
+                                        %%
+                                        % QUESTION
+                                        %%
+                                        \item \hspace{-7mm}
+                                        \begin{tabular}{m{1mm} m{\qrwidth} m{0.9\columnwidth} m{1mm} m{\qrwidth}}
+                                         & \framebox{\matcode {O\uniqueid\two@digits{\theId}}} & \theScore \enuna \\
+                                        \end{tabular}\vspace{2mm}
+                                        \\ \theLabel %\\ TODO: REMOVED FUNDINF EP1
+                                        %%%
+                                        \setlength{\extrarowheight}{0.25cm}
+                                        %%%
+                                \fi
+                                %%
+                                %% qstyle = 6 -> empty
+                                %%
+                                \ifnum\pdfstrcmp{\qstyle}{6}=0
+                                        \item[] ~
+                                        \begin{minipage}{\textwidth}
+                                        \begin{center}
+                                            \theLabel
+                                        \end{center}
+                                        \end{minipage}
+                                \fi
+                                %%
+                        }
+                        \vfill
+                }
+        %%%
+        \end{enumerate}
+        %%%
+}
+
+
+%%%%%%%% USEFUL MACROS
+
+\newcommand{\wordingfig}[4]{
+        #1
+        \begin{center}
+                \includegraphics[#2]{#3}
+        \end{center}
+        #4
+}
+
+\newcommand{\wordingopn}[3]{
+        \begin{minipage}[t]{\textwidth}
+        #1
+        \vspace{5mm}
+        \end{minipage}\\
+        \begin{minipage}[t]{\textwidth}
+        #2
+        \vspace{5mm}
+        \end{minipage}\\
+        \begin{minipage}[t]{\textwidth}
+        #3
+        \end{minipage}
+}
+
+
+\newcommand{\responsefig}[2]{
+        \includegraphics[valign=m,width=#1\columnwidth]{#2}
+}
+
+\newcommand{\uniqueqr}{
+        \marginbox{1pt 1pt 1pt 1pt}{\framebox{\matcode{P\uniqueid\thepage}}}
+}
+
+\newcommand{\nialocationqr}{
+        \marginbox{1pt 1pt 1pt 1pt}{\framebox{\matcode{M\uniqueid}}}
+}
+
+\newcommand{\uniqueqrQ}{
+        \marginbox{1pt 1pt 1pt 1pt}{\framebox{\matcode{Q\uniqueid\thepage}}}
+}
+
+
+\newcommand{\IDMatrix}[3]{
+\setlength{\extrarowheight}{4mm}
+\begin{center}
+%{\fontfamily{qcr}\selectfont
+\begin{tabular}{ c c c c c c c c c c c}
+& 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 0\\
+#3 \#1 &
+\framebox{\matcode{N#201}} &
+\framebox{\matcode{N#202}} &
+\framebox{\matcode{N#203}} &
+\framebox{\matcode{N#204}} &
+\framebox{\matcode{N#205}} &
+\framebox{\matcode{N#206}} &
+\framebox{\matcode{N#207}} &
+\framebox{\matcode{N#208}} &
+\framebox{\matcode{N#209}} &
+\framebox{\matcode{N#200}}
+\\[5pt]
+
+#3 \#2  &
+\framebox{\matcode{N#211}} &
+\framebox{\matcode{N#212}} &
+\framebox{\matcode{N#213}} &
+\framebox{\matcode{N#214}} &
+\framebox{\matcode{N#215}} &
+\framebox{\matcode{N#216}} &
+\framebox{\matcode{N#217}} &
+\framebox{\matcode{N#218}} &
+\framebox{\matcode{N#219}} &
+\framebox{\matcode{N#210}}\\[5pt]
+
+
+#3 \#3  &
+
+\framebox{\matcode{N#221}} &
+\framebox{\matcode{N#222}} &
+\framebox{\matcode{N#223}} &
+\framebox{\matcode{N#224}} &
+\framebox{\matcode{N#225}} &
+\framebox{\matcode{N#226}} &
+\framebox{\matcode{N#227}} &
+\framebox{\matcode{N#228}} &
+\framebox{\matcode{N#229}} &
+\framebox{\matcode{N#220}}\\[5pt]
+
+
+#3 \#4  &
+\framebox{\matcode{N#231}} &
+\framebox{\matcode{N#232}} &
+\framebox{\matcode{N#233}} &
+\framebox{\matcode{N#234}} &
+\framebox{\matcode{N#235}} &
+\framebox{\matcode{N#236}} &
+\framebox{\matcode{N#237}} &
+\framebox{\matcode{N#238}} &
+\framebox{\matcode{N#239}} &
+\framebox{\matcode{N#230}}\\[5pt]
+
+#3 \#5  &
+\framebox{\matcode{N#241}} &
+\framebox{\matcode{N#242}} &
+\framebox{\matcode{N#243}} &
+\framebox{\matcode{N#244}} &
+\framebox{\matcode{N#245}} &
+\framebox{\matcode{N#246}} &
+\framebox{\matcode{N#247}} &
+\framebox{\matcode{N#248}} &
+\framebox{\matcode{N#249}} &
+\framebox{\matcode{N#240}}\\[5pt]
+
+
+#3 \#6  &
+\framebox{\matcode{N#251}} &
+\framebox{\matcode{N#252}} &
+\framebox{\matcode{N#253}} &
+\framebox{\matcode{N#254}} &
+\framebox{\matcode{N#255}} &
+\framebox{\matcode{N#256}} &
+\framebox{\matcode{N#257}} &
+\framebox{\matcode{N#258}} &
+\framebox{\matcode{N#259}} &
+\framebox{\matcode{N#250}}\\[5pt]
+\end{tabular}
+%}
+\end{center}
+}
+
+\newcommand{\qrgraderpagestyle}[2]{
+    \fancyhf{}
+
+    \pagenumbering{arabic}
+
+    \fancyhead[L]{#2}
+    \fancyhead[C]{#1\\[-1pt]}
+    \fancyhead[R]{\uniqueid\uniqueqr\\[-10pt]}
+    \fancyfoot[C]{\thepage}
+    \fancyfoot[L]{\uniqueqrQ}
+    \renewcommand{\headrulewidth}{0.8pt}
+    \renewcommand{\footrulewidth}{0.8pt}
+    \pagestyle{fancy}
+}
+
+
+
+\endinput
+%%
+
+\qrgraderpagestyle
+
+%% End of file `qrgrader.sty'.

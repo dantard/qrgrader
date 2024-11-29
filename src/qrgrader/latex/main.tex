@@ -1,0 +1,63 @@
+\documentclass[a4paper, oneside, spanish]{article}
+\usepackage[aztec]{qrgrader}
+\qrgraderpagestyle{Subject name or exam title}
+
+\begin{document}
+
+    \IDMatrix{0.6cm}{\uniqueid}{Student ID figure}
+
+    \begin{exam}[shuffle=off, style=matrix, showcorrect=no, encode=yes]
+
+        \question[score=0.5, penalty=0.125, brief=first]{1}
+        {Stem 1}
+%%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+%%
+        \question[score=0.5, penalty=0.125, brief=second, style=horizontal]{2}
+        {Stem 2}
+%%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+%
+        \question[score=0.5, penalty=0.125, brief=third, style=list]{3}
+        {Stem 3}
+%%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+
+        \question[score=0.5, penalty=0.125, brief=fourth, style=list]{4}
+        {Stem 4}
+%%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+
+        \develquestion[score=1]{5}{
+            \textbf{Open question}
+        }
+        {
+            Stem of the open question
+        }
+
+    \end{exam}
+\end{document}

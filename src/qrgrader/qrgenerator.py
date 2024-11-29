@@ -3,323 +3,167 @@
 from __future__ import print_function
 
 import argparse
-import multiprocessing
 import os.path
 import re
-import shutil
-import subprocess
-import threading
+import sys
+from multiprocessing import Manager
 from os import listdir
-from pylatexenc.latex2text import LatexNodes2Text
 
-import pymupdf as fitz
+from qrgrader.common import get_workspace_paths, get_temp_paths, check_workspace, get_date, get_prefix
+from qrgrader.generator import Generator
+from qrgrader.utils import makedir
 
-########################### float(re.sub("[^\d\.]", "", "(2.4 puntos)"))
-
-
-from qrgrader.python.support import *
 
 def main():
     parser = argparse.ArgumentParser(description='Patching and detection')
     parser.add_argument('-b', '--begin', help='First exam number', default=1, type=int)
     parser.add_argument('-c', '--cleanup', help='Clear pool files', action='store_true')
-    parser.add_argument('-D', '--draft', help='Force draft generation', action='store_true')
     parser.add_argument('-f', '--filename', help='Specify .tex filename', default=None)
     parser.add_argument('-j', '--threads', help='Maximum number of threads to use (4)', default=4, type=int)
-    parser.add_argument('-k', '--feedback', help='Generate feedback csv file', action='store_true')
-    parser.add_argument('-n', '--number', help='Number or exams to be generated (1)', default=0, type=int)
-    parser.add_argument('-p', '--process', help='Process source folder (main.tex)', action='store_true')
+    parser.add_argument('-n', '--number', help='Number or exams to be generated', default=0, type=int)
     parser.add_argument('-P', '--pages', help='Acceptable number of pages of output PDF', default=-1, type=int)
-    parser.add_argument('-Q', '--questions', help='Generate questions csv', action='store_true')
+    parser.add_argument('-T', '--temp', help='Specify temp directory', type=str, default="/tmp")
+    parser.add_argument('-q', '--questions', help='Generate questions csv', action='store_true')
+    parser.add_argument('-g', '--generated', help='Generate questions csv', action='store_true')
     parser.add_argument('-v', '--verbose', help='Extra verbosity', action='store_true')
-
-    if len(sys.argv) == 1:
-        parser.print_usage()
-        sys.exit()
-
     args = vars(parser.parse_args())
-    exe_name = os.path.basename(sys.argv[0])
-    dir_name = os.path.basename(os.getcwd())
 
-    if re.match("qrgrading-[0-9][0-9][0-9][0-9][0-9][0-9]", dir_name) == None:
-        print("ERROR: {} must be run in the root of the workspace".format(exe_name))
-        sys.exit(0)
+    if not check_workspace():
+        print("ERROR: qrscanner must be run from a workspace directory")
+        sys.exit(1)
 
-    filename = args["filename"]
-    number = int(args["number"])
-    # date = args["date"]
-    begin = args["begin"]
-    threads = args["threads"]
-    verbose = args["verbose"]
-    generate_feedback = args["feedback"]
-    generate_questions = args["questions"]
-    per_pages = args["pages"]
-    do_process = args["process"]
-    desired_pages = args["pages"]
-    cleanup = args["cleanup"]
+    date = get_date()
+    prefix = get_prefix()
 
-    isdraft = "draft" if args["draft"] else ""
-
+    (file, number, begin,
+     threads, verbose, desired_pages,
+     create_generated, create_questions, cleanup, temporary, filename) = (args["filename"], args["number"],
+                                                                          args["begin"], args["threads"],
+                                                                          args["verbose"], args["pages"],
+                                                                          args["generated"], args["questions"],
+                                                                          args["cleanup"], args["temp"], args["filename"])
     if number > 0:
-        do_process = True
+        create_generated = True
+        create_questions = True
 
-    if do_process:
-        generate_feedback = True
-        generate_questions = True
+    dir_workspace, dir_data, _, dir_generated, dir_xls, _, dir_source = get_workspace_paths(os.getcwd())
+    _, dir_temp_generator = get_temp_paths(date, os.getcwd() if temporary is None else temporary)
 
-    # if date is None:
-    #    date = thedate.today().strftime("%y%m%d")
-
-    date = int(''.join(filter(str.isdigit, dir_name)))
+    print("Workspace: {}".format(dir_temp_generator))
 
     if desired_pages != -1:
-        print("WARNING: With -P option {} will try to generate a maximum of {} exams to get {} with {} pages".format(exe_name, 4 * number, number, desired_pages))
-        print("WARNING: With -P option {} may generate up to {} more exams than needed.".format(exe_name, threads))
+        print("WARNING: With -P option qrgenerator will generate a maximum of {} exams to get {} with {} pages".format(4 * number, number, desired_pages))
+        print("WARNING: With -P option qrgenerator may generate up to {} more exams than needed.".format(threads))
 
-    base = os.getcwd() + os.sep
-    pool = base + "generated" + os.sep + "pdf"
-    qrs = base + "generated" + os.sep + "qr"
-    xls = base + "results" + os.sep + "xls"
-    publish = base + "results" + os.sep + "publish"
-    scanned = base + "scanned"
-    source_pool = base + "source" + os.sep + "pool"
+    if number > 0:
 
-    makedir(source_pool, True)
-
-    threadLimiter = multiprocessing.BoundedSemaphore(threads)
-    mutex = threading.Lock()
-
-
-    class Done:
-        def __init__(self):
-            self.done = 0
-
-        def inc_done(self):
-            global done
-            mutex.acquire()
-            self.done = self.done + 1
-            mutex.release()
-
-        def get_done(self):
-            return self.done
-
-
-    done = Done()
-
-
-    class Latexer(threading.Thread):
-        def __init__(self, filename, pool, uniqueid, working_dir, draft=""):
-            self.uniqueid = uniqueid
-            self.pool = pool
-            self.filename = filename
-            self.working_dir = working_dir
-            self.draft = draft
-            threading.Thread.__init__(self)
-
-        def run(self):
-
-            process = subprocess.Popen(['xelatex',
-                                        '-interaction', 'nonstopmode',
-                                        '-halt-on-error',
-                                        '-output-directory', '{}'.format(source_pool),
-                                        '-jobname', '{}'.format(self.uniqueid),
-                                        '\\newcommand{{\\draftoverride}}{{{:s}}}'
-                                        '\\newcommand{{\\uniqueid}}{{{:s}}}\\input{{{:s}}}"'.format(self.draft, self.uniqueid,
-                                                                                                    self.filename)],
-                                       stdout=subprocess.PIPE,
-                                       universal_newlines=True,
-                                       cwd=self.working_dir)
-
-            while True:
-                output = process.stdout.readline()
-                verbose and print(output.strip())
-                if "MATCODE" in output.strip():
-                    print(output)
-
-                # Do something else
-                return_code = process.poll()
-                if return_code is not None:
-                    if return_code == 0:
-                        this_one_done = True
-                        if desired_pages != -1:
-                            the_pdf = fitz.open(source_pool + os.sep + str(self.uniqueid) + ".pdf")
-                            if the_pdf.page_count != desired_pages:
-                                this_one_done = False
-                                print("Discarding exam {} ({} pages)".format(self.uniqueid, the_pdf.page_count))
-
-                        if this_one_done:
-                            done.inc_done()
-                            shutil.move(source_pool + os.sep + str(self.uniqueid) + ".pdf", pool + os.sep + str(self.uniqueid) + ".pdf")
-                            print("Done exam {} ({}/{})".format(self.uniqueid, done.get_done(), number))
-                    else:
-                        print(" * ERROR: Exam {} generation has finished with return code: {}".format(self.uniqueid, return_code))
-                    # Process has finished, read rest of the output
-                    for output in process.stdout.readlines():
-                        (verbose or return_code != 0) and print(output.strip())
-
-                    break
-
-            threadLimiter.release()
-
-
-    if do_process:
-
-        processes = []
+        makedir(dir_generated, clear=True)
+        makedir(dir_temp_generator, clear=True)
 
         if filename is None:
-            source = base + "source"
-            filename = "main.tex"
+            source = dir_source
+            filename = dir_source + "main.tex"
         else:
             source = os.path.dirname(os.path.abspath(filename))
             filename = os.path.basename(filename)
 
-        if not os.path.exists(source + os.sep + filename):
+        if not os.path.exists(filename):
             print("ERROR: Source file {} does not exist".format(source + os.sep + filename))
-            sys.exit(0)
+            sys.exit(1)
 
         print("** Starting parallelized generation (using {} threads)".format(threads))
 
         end = begin + (number if desired_pages == -1 else 4 * number)
 
-        for i in range(begin, end):
+        processes = []
 
-            threadLimiter.acquire()
+        with Manager() as manager:
+            queue = manager.BoundedSemaphore(threads)
 
-            uniqueid = "{}{:03d}".format(date, i)
-            p = Latexer(filename, pool, uniqueid, source, isdraft)
-            p.start()
-            processes.append(p)
+            for i in range(begin, end):
+                queue.acquire()
+                print("Creating exam {}{:03d} ({:d} ready)".format(date, i, len(os.listdir(dir_generated))))
+                p = Generator(queue, filename, "{}{:03d}".format(date, i),
+                              dir_temp_generator=dir_temp_generator,
+                              dir_generated=dir_generated,
+                              dir_source=source,
+                              desired_pages=desired_pages,
+                              verbose=verbose)
 
-            if desired_pages != -1 and done.get_done() >= number:
-                break
+                processes.append(p)
+                p.start()
 
-        for p in processes:
-            p.join()
+            for p in processes:
+                p.join()
 
-        if desired_pages != -1:
-            print("Total exams generated: {}".format(done.get_done()))
+            print("Done ({:d} exams generated).".format(len(os.listdir(dir_generated))))
 
-        # pdfs = [x for x in listdir(source_pool) if x.endswith(".pdf")]
+    if create_generated:
+        print("Creating generated.csv file...", end="")
+        logs = sorted([x for x in listdir(dir_temp_generator) if x.endswith(".aux")])
 
-        # for pdf in pdfs:
-        #    shutil.move(source_pool + os.sep + pdf, pool + os.sep + pdf)
-
-        codes = []
-        logs = [x for x in listdir(source_pool) if x.endswith(".aux")]
-        logs.sort()
-
-        w = open(qrs + os.sep + "generated.txt", "w")
+        w = open(dir_data + prefix + "generated.csv", "w", encoding='utf-8')
         for f in logs:
-            pdf_page = 0  # was 1 before merging (commented lines below)
-            f = open(source_pool + os.sep + f, "r")
+            pdf_page = 0
+            f = open(dir_temp_generator + os.sep + f, "r", encoding='utf-8')
+
             for line in f:
-                if line.startswith("\zref@newlabel{QRPOSE"):
+                if line.startswith("\\zref@newlabel{QRPOSE"):
                     words_with_numbers = re.findall(r'\b\w*\d\w*\b', line)
                     if len(words_with_numbers) != 5:
                         print("ERROR: QRPOSE line does not have 5 values: {}".format(line))
                         sys.exit(0)
                     else:
-                        # line = line.replace("\zref@newlabel{QRPOSE,", "") \
-                        #     .replace("}{\posx{", ",") \
-                        #     .replace("}\posy{", ",") \
-                        #     .replace("}\\abspage{", ",").replace("}}", "").strip()
                         qr_data, posx, posy, abs_page, page_value = words_with_numbers
 
                         if qr_data.startswith("P"):
                             pdf_page += 1
 
-                        params = line.split(sep=",")
                         line = "{},{},{},{},{},{},{}\n".format(qr_data, posx, posy, 0, 0, abs_page, pdf_page)
-
-                        # if line.startswith("P"):
-                        #    pdf_page += 1
                         w.write(line)
             f.close()
         w.close()
+        print("Done.")
 
-    if generate_feedback:
-        codes = []
+    if create_questions:
+        logs = [x for x in listdir(dir_temp_generator) if x.endswith(".log")]
 
-        w = open(qrs + os.sep + "generated.txt", "r")
+        if len(logs) > 0:
+            print("Creating questions csv file...", end="")
 
-        for line in w:
-            params = line.split()
-            codes.append(Code(0, params[0], 0, 0, 0, 0))
+            any_log_will_do = dir_temp_generator + os.sep + logs[0]
 
-        w.close()
+            with open(any_log_will_do, "r", encoding='utf-8') as file:
+                log = file.read()
+                log = log.split(";;;")
+                questions_number = []
+                with open(dir_xls + prefix + "questions.csv".format(date), "w", encoding='utf-8') as filew:
+                    data = "ID\tTYPE\tA\tB\tC\tD\tBRIEF\n"
 
-        if len(codes) > 0:
-            exams = set()
-            date = codes[0].date
-            for c in codes:
-                if c.type == 0:
-                    exams.add(c.exam)
+                    for i in range(1, len(log) - 1):
+                        line = log[i].replace("\n", "").replace("\t", "")
+                        fields = line.split(";;")
+                        fields = [f for f in fields if f != ""]
+                        if len(fields) == 6:
 
-            exams = list(exams)
-            exams.sort()
-            print("Creating feedback file...", end="")
-            w = open(xls + os.sep + "{}_feedback.csv".format(date), "w")
+                            if fields[0] in questions_number:
+                                print("\n****************************************************")
+                                print("*** WARNING: Multiple questions with same id: {:2s} ***".format(fields[0]))
+                                print("****************************************************")
+                            else:
+                                questions_number.append(fields[0])
 
-            for e in exams:
-                w.write("{}{}".format(date, e))
-                for c in codes:
-                    if c.exam == e and c.type == 0:
-                        id = (c.question - 1) * 4 + c.answer
-                        w.write(",{}".format(id))
-                w.write("\n")
-
-            w.close()
-            print("Done.")
-        else:
-            print("No QR data found, exiting.")
-
-        # Generate xxxxxx_questions.csv
-
-        if generate_questions:
-            logs = [x for x in listdir(source_pool) if x.endswith(".log")]
-            if len(logs) > 0:
-                print("Creating questions csv file...", end="")
-                any_log_will_do = source_pool + os.sep + logs[0]
-
-                with open(any_log_will_do, 'r') as file:
-                    log = file.read()
-                    log = log.split(";;;")
-                    questions_number = []
-                    with open(xls + os.sep + "{}_questions.csv".format(date), 'w') as filew:
-                        data = str()
-                        for i in range(1, len(log) - 1):
-                            line = log[i].replace("\n", "").replace("\t", "")
-                            fields = line.split(";;")
-                            fields = [f for f in fields if f != ""]
-                            if len(fields) == 5:
-
-                                if fields[0] in questions_number:
-                                    print("\n****************************************************")
-                                    print("*** WARNING: Multiple questions with same id: {:2s} ***".format(fields[0]))
-                                    print("****************************************************")
-                                else:
-                                    questions_number.append(fields[0])
-
-                                line = fields[0] + "\t" + fields[1] + \
-                                       "\t" + (fields[3] if fields[2] == "a" else "0") + \
-                                       "\t" + (fields[3] if fields[2] == "b" else "0") + \
-                                       "\t" + (fields[3] if fields[2] == "c" else "0") + \
-                                       "\t" + (fields[3] if fields[2] == "d" else "0") + \
-                                       "\t" + fields[4]
-                                       #"\t" + LatexNodes2Text().latex_to_text(fields[5]).replace("\t", "").replace("\n", " ") + \
-                                       #"\t" + LatexNodes2Text().latex_to_text(fields[6]).replace("\t", "").replace("\n", " ") + \
-                                       #"\t" + LatexNodes2Text().latex_to_text(fields[7]).replace("\t", "").replace("\n", " ") + \
-                                       #"\t" + LatexNodes2Text().latex_to_text(fields[8]).replace("\t", "").replace("\n", " ") + \
-                                       #"\t" + LatexNodes2Text().latex_to_text(fields[9]).replace("\t", "").replace("\n", " ")
-                                data += line + "\n"
-                        filew.write(data)
-
-
-    if cleanup:
-        print("Cleaning pool directory")
-        shutil.rmtree(source_pool, ignore_errors=True)
+                            line = fields[0] + "\t" + fields[1] + \
+                                   "\t" + (fields[3] if fields[2] == "a" else fields[4].replace(" ", "")) + \
+                                   "\t" + (fields[3] if fields[2] == "b" else fields[4].replace(" ", "")) + \
+                                   "\t" + (fields[3] if fields[2] == "c" else fields[4].replace(" ", "")) + \
+                                   "\t" + (fields[3] if fields[2] == "d" else fields[4].replace(" ", "")) + \
+                                   "\t" + fields[5]
+                            data += line + "\n"
+                    filew.write(data)
 
     print("Done.")
+
 
 if __name__ == "__main__":
     main()
