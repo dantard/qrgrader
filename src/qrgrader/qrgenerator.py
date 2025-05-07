@@ -80,8 +80,11 @@ def main():
         with Manager() as manager:
             queue = manager.BoundedSemaphore(threads)
 
-            for i in range(begin, end):
+            i = begin
+
+            while i < end and len(os.listdir(dir_generated)) < number:
                 queue.acquire()
+
                 print("Creating exam {}{:03d} ({:d} ready)".format(date, i, len(os.listdir(dir_generated))))
                 p = Generator(queue, filename, "{}{:03d}".format(date, i),
                               dir_temp_generator=dir_temp_generator,
@@ -92,6 +95,7 @@ def main():
 
                 processes.append(p)
                 p.start()
+                i += 1
 
             for p in processes:
                 p.join()
