@@ -29,10 +29,14 @@ def main():
     parser.add_argument('-a', '--annotate', help='Annotate files', action="store_true")
     parser.add_argument('-n', '--nia', help='Create NIA file', action="store_true")
     parser.add_argument('-r', '--raw', help='Create RAW file', action="store_true")
+    parser.add_argument('-c', '--correct', help='Correct QRs position (according to -x -y and -z)', action="store_true")
     parser.add_argument('-S', '--simulate', help='Create random marked files', type=int, default=0)
     parser.add_argument('-e', '--reconstruct', help='Reconstruct exams', action="store_true")
     parser.add_argument('-p', '--process', help='Options -snre', action="store_true")
     parser.add_argument('-T', '--temp', help='Specify temp directory', type=str, default="/tmp")
+    parser.add_argument('-z', '--zoom', help='Specify printer zoom', type=float, default=1.0)
+    parser.add_argument('-x', '--xdisp', help='Specify printer X displacement', type=float, default=0.0)
+    parser.add_argument('-y', '--ydisp', help='Specify printer Y displacement', type=float, default=0.0)
 
     args = vars(parser.parse_args())
 
@@ -45,12 +49,34 @@ def main():
 
     prefix = str(get_date()) + "_"
 
+
+
     ppm = args.get("dpi") / 25.4
     if args.get("process"):
         args["scan"] = True
         args["nia"] = True
         args["raw"] = True
         args["reconstruct"] = True
+
+    zoom = args.get("zoom", 1.0)
+    xdisp = args.get("xdisp", 0.0)
+    ydisp = args.get("ydisp", 0.0)
+
+    if args.get("correct") > 0:
+        codes = CodeSet()
+        if not codes.load(dir_data + prefix + "detected.csv"):
+            print("ERROR: detected.csv not found")
+            sys.exit(1)
+
+        for code in codes:
+            code: Code
+            code.x = code.x * zoom + xdisp
+            code.y = code.y * zoom + ydisp
+            code.w = code.w * zoom
+            code.h = code.h * zoom
+
+        codes.save(dir_data + prefix + "detected.csv")
+
 
     if (simulate := args.get("simulate")) > 0:
         print("Simulation in progress ({} files)".format(simulate))
@@ -224,13 +250,13 @@ def main():
                 f.write(line + "\n")
 
     if args.get("annotate"):
-        print("Annotating exams")
         questions = Questions(dir_xls + prefix + "questions.csv")
         if not questions.load():
             print("ERROR: questions.csv not found")
             sys.exit(1)
 
         for exam in exams:
+            print("Annotating exam {}".format(exam), end="\r")
             filename = dir_publish + "{}{:03d}.pdf".format(date, exam)
             pdf_file = pymupdf.open(filename)
             for page in pdf_file:
@@ -243,7 +269,7 @@ def main():
                     if code.marked:
                         x, y = code.get_pos()
                         w, h = code.get_size()
-                        r = pymupdf.Rect(x, y, x + w, y + h)
+                        r = pymupdf.Rect(xdisp + x*zoom, ydisp + y*zoom, xdisp + x*zoom + w*zoom, ydisp + y*zoom + h*zoom)
                         annot = page.add_rect_annot(r)
                         annot.set_border(width=2)
                         if questions.get_value(code.question, code.answer) > 0:
