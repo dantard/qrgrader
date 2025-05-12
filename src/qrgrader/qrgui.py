@@ -4,7 +4,7 @@ import sys
 
 from PyQt5.QtCore import Qt, QObject, pyqtSignal
 from PyQt5.QtGui import QPen
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QInputDialog
 from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, QSplitter, QGraphicsRectItem, QTabWidget, QLabel, QVBoxLayout, \
     QSizePolicy, QFormLayout, QCheckBox, QGroupBox
 from easyconfig2.easyconfig import EasyConfig2
@@ -35,6 +35,18 @@ class Mark(QGraphicsRectItem):
     def mouseDoubleClickEvent(self, event):
         self.signal.double_click.emit(self.code)
 
+class EditableLabel(QLabel):
+    new_value = pyqtSignal(int)
+
+    def __init__(self):
+        super().__init__()
+
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        a, b = QInputDialog.getInt(self, "Edit Value", "Enter new value:", int(self.text()))
+        if b:
+            self.setText(str(a))
+            self.new_value.emit(a)
 
 class MainWindow(QMainWindow):
     def __init__(self, schema_filenames):
@@ -81,7 +93,8 @@ class MainWindow(QMainWindow):
         self.name_lbl.setMinimumWidth(300)
         self.name_lbl.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
 
-        self.nia_lbl = QLabel()
+        self.nia_lbl = EditableLabel()
+        self.nia_lbl.new_value.connect(self.change_nia)
         self.nia_lbl.setMinimumWidth(100)
         self.nia_lbl.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
 
@@ -137,6 +150,22 @@ class MainWindow(QMainWindow):
         if self.pdf_tree.topLevelItemCount() > 0:
             self.pdf_tree.setCurrentItem(self.pdf_tree.topLevelItem(0))
 
+        for index in range(self.pdf_tree.topLevelItemCount()):
+            item = self.pdf_tree.topLevelItem(index)
+            exam_id = int(item.text(1))
+            nia = self.xls_nia.get_nia(exam_id)
+            if len(self.get_multiple_marks(exam_id)) > 0:
+                item.setText(2, "!")
+            elif nia is None or type(nia) == str:
+                item.setText(2, "@")
+            else:
+                item.setText(2, "")
+
+            # if len(self.get_multiple_marks(exam_id)) > 0:
+            #     item.setText(2, "!")
+            # else:
+            #     item.setText(2, "")
+
         x, y, w, h, fullscreen = self.cfg_geometry.get()
         if fullscreen:
             self.showFullScreen()
@@ -144,6 +173,10 @@ class MainWindow(QMainWindow):
             self.setGeometry(x, y, w, h)
 
         self.show()
+
+    def change_nia(self, nia):
+        self.xls_nia.set_nia(self.current_exam, nia)
+        self.xls_nia.save()
 
     def closeEvent(self, a0):
         self.cfg_geometry.set(
@@ -233,6 +266,7 @@ class MainWindow(QMainWindow):
         self.swik.open(f"{self.dir_publish}{self.current_exam}.pdf", ratio=ratio, index=index)
 
     def load_finished(self):
+        self.pdf_tree.set_enabled(True)
 
         self.process_exam()
 
@@ -245,16 +279,17 @@ class MainWindow(QMainWindow):
             rubric.pull(self.current_exam)
 
         self.update_scores_layout()
-
-        for index in range(self.pdf_tree.topLevelItemCount()):
-            item = self.pdf_tree.topLevelItem(index)
-            exam_id = int(item.text(1))
-            if len(self.get_multiple_marks(exam_id)) > 0:
-                item.setText(2, "!")
-            else:
-                item.setText(2, "")
-
         self.pdf_tree.set_enabled(True)
+        return
+
+        # for index in range(self.pdf_tree.topLevelItemCount()):
+        #     item = self.pdf_tree.topLevelItem(index)
+        #     exam_id = int(item.text(1))
+        #     if len(self.get_multiple_marks(exam_id)) > 0:
+        #         item.setText(2, "!")
+        #     else:
+        #         item.setText(2, "")
+
 
     def populate_pdf_tree(self):
         files = os.listdir(self.dir_publish)
@@ -355,6 +390,17 @@ class MainWindow(QMainWindow):
         self.update_scores_layout()
         self.update_pdf_tree_score()
         self.detected.save(self.dir_data + self.prefix + "detected.csv")
+
+        item = self.pdf_tree.currentItem()
+        nia = self.xls_nia.get_nia(code.unique)
+
+        if len(self.get_multiple_marks(int(code.exam))) > 0:
+            item.setText(2, "!")
+        elif nia is None or type(nia) == str:
+            item.setText(2, "@")
+        else:
+            item.setText(2, "")
+
 
 
 def main():

@@ -130,7 +130,7 @@ def main():
 
             files = [x for x in os.listdir(dir_scanned) if x.endswith(".pdf")]
             for filename in files:
-                print("Processing file {}".format(filename))
+                #print("Processing file {}".format(filename))
                 document = pymupdf.open(dir_scanned + filename)
                 last_page = args.get("end") if args.get("end") is not None else len(document)
                 document.close()
@@ -142,12 +142,18 @@ def main():
                     # 2. Rendering the page image in parallel make the whole process much faster
                     # 3. For some reason sending the image to the process creates memory overflow
 
+                    procs = [p for p in processes if not p.is_alive()].copy()
+                    for process in procs:
+                        process.join()
+                        processes.remove(process)
+
                     process = PageProcessor(dir_scanned + filename, i, generated, detected, dir_images=dir_temp_scanner, resize=args.get("ratio"))
                     processes.append(process)
                     process.start()
 
                     while len([p for p in processes if p.is_alive()]) >= 4:
                         time.sleep(0.25)
+
 
             for process in processes:
                 process.join()

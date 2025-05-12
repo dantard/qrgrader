@@ -192,7 +192,7 @@ class StepButton(StateButton):
 
     def set_state(self, state):
         self.set_comment(state.get("comment", ""))
-        value = state.get("value", 0)
+        value = state.get("value", -1)
 
         self.button.blockSignals(True)
         self.button.setChecked(value >= 0 if self.n_steps > 0 else value > 0)

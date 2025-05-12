@@ -396,6 +396,7 @@ class Rubric(QListWidget):
     def retrieve(self, exam_id):
         self.current_exam_id = exam_id
         rubric_data = self.scores.get(exam_id, {})
+
         if rubric_data is not None:
             for button in self.filter_buttons(StateButton):  # type: Score
                 button.blockSignals(True)

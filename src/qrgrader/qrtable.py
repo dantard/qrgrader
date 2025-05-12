@@ -64,8 +64,8 @@ def main():
 
     # Insert the GRADE column
     raw.insert(inserted + 2, "GRADE", '=SUMPRODUCT(INDIRECT(ADDRESS(ROW(), COLUMN() + 1) & ":" '
-                                      '& ADDRESS(ROW(), COLUMNS(A1:1))), INDIRECT(ADDRESS(4, COLUMN() + 1) & ":" '
-                                      '& ADDRESS(4, COLUMNS(A1:1))))')
+                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1))), INDIRECT(ADDRESS(4, COLUMN() + 1) & ":" '
+                                      '& ADDRESS(4, COLUMNS($A$1:$1))))')
     inserted += 1
 
     # Fill the header

@@ -34,6 +34,7 @@ setup(
             'qrsheets=qrgrader.qrsheets:main',
             'qrgenerator=qrgrader.qrgenerator:main',
             'qrworkspace=qrgrader.qrworkspace:main',
+            'qrtable=qrgrader.qrtable:main',
         ],
     },
     package_data={

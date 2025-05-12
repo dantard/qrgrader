@@ -16,26 +16,31 @@ class Code:
         self.page = page
         self.pdf_page = pdf_page
         if self.data[0] == "O":
+            self.unique = int(self.data[1:10])
             self.date = int(self.data[1:7])
             self.exam = int(self.data[7:10])
             self.question = int(self.data[10:12])
             self.type = self.TYPE_O
         elif self.data[0] == "P":
+            self.unique = int(self.data[1:10])
             self.date = int(self.data[1:7])
             self.exam = int(self.data[7:10])
             self.page = int(self.data[10:12])
             self.type = self.TYPE_P
         elif self.data[0] == "Q":
+            self.unique = int(self.data[1:10])
             self.date = int(self.data[1:7])
             self.exam = int(self.data[7:10])
             self.page = int(self.data[10:12])
             self.type = self.TYPE_Q
         elif self.data[0] == "N":
+            self.unique = int(self.data[1:10])
             self.date = int(self.data[1:7])
             self.exam = int(self.data[7:10])
             self.number = int(self.data[10:12])
             self.type = self.TYPE_N
         else:
+            self.unique = int(self.data[0:9])
             self.date = int(self.data[0:6])
             self.exam = int(self.data[6:9])
             self.question = int(self.data[9:11])

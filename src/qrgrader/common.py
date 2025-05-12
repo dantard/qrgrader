@@ -26,8 +26,8 @@ def get_temp_paths(date, base):
 def get_date():
     if not check_workspace():
         raise Exception("get_date must be used from within a workspace directory")
-
-    date = os.getcwd().split("-")[1].strip("/")
+    current_dir = os.path.basename(os.getcwd())
+    date = current_dir.split("-")[1].strip("/")
     return date
 
 
@@ -131,6 +131,7 @@ class Nia:
         return False
 
     def get_nia(self, exam):
+        # EXAM FORMAT: 240509002
         by_exam = self.nia[self.nia["EXAM"] == int(exam)]
         if by_exam.empty or by_exam.iloc[0]["NIA"] is None:
             return None
@@ -143,6 +144,17 @@ class Nia:
             return None
 
         return by_nia.iloc[0]["EXAM"]
+
+    def set_nia(self, exam_id, nia):
+        # EXAM FORMAT: 240509002
+        self.nia.loc[self.nia['EXAM'] == int(exam_id), 'NIA'] = int(nia)
+
+
+    def save(self):
+        if self.nia is None:
+            return False
+        self.nia.to_csv(self.filename, sep='\t', index=False)
+        return True
 
 
 def get_narrowest_type(cell):

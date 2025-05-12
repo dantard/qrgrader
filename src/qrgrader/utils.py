@@ -63,14 +63,15 @@ def get_patches(orig, ppm, size_mm, tolerance=0.25):
 
 def get_codes(patch):
     codes = set()
-    results = zxingcpp.read_barcodes(patch, formats=zxingcpp.BarcodeFormat.Aztec | zxingcpp.BarcodeFormat.QRCode)
-    for result in results:
-        if result.text not in codes:
-            top_left_x = min(result.position.top_left.x, result.position.bottom_right.x)
-            top_left_y = min(result.position.top_left.y, result.position.bottom_right.y)
-            width = abs(result.position.top_left.x - result.position.bottom_right.x)
-            height = abs(result.position.top_left.y - result.position.bottom_right.y)
-            codes.add((result.text, top_left_x, top_left_y, width, height))
+    if patch.shape[0] > 0 and patch.shape[1] > 0:
+        results = zxingcpp.read_barcodes(patch, formats=zxingcpp.BarcodeFormat.Aztec | zxingcpp.BarcodeFormat.QRCode)
+        for result in results:
+            if result.text not in codes:
+                top_left_x = min(result.position.top_left.x, result.position.bottom_right.x)
+                top_left_y = min(result.position.top_left.y, result.position.bottom_right.y)
+                width = abs(result.position.top_left.x - result.position.bottom_right.x)
+                height = abs(result.position.top_left.y - result.position.bottom_right.y)
+                codes.add((result.text, top_left_x, top_left_y, width, height))
     return codes
 
 
