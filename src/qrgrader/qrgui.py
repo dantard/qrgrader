@@ -147,7 +147,9 @@ class MainWindow(QMainWindow):
         files = os.listdir(self.dir_publish)
         files = [f for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()]
 
-        progress = QProgressDialog("Processing...", "Cancel", 0, 10 + len(files), self)
+        progress = QProgressDialog("Processing...", None, 0, 10 + len(files), self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setWindowTitle("QRGrader")
         progress.show()
 
         def delayed():
@@ -176,16 +178,25 @@ class MainWindow(QMainWindow):
                 else:
                     item.setText(2, "")
 
-                # if len(self.get_multiple_marks(exam_id)) > 0:
-                #     item.setText(2, "!")
-                # else:
-                #     item.setText(2, "")
+                if len(self.rubrics) > 0:
+                    self.update_done_color(item)
+
             progress.hide()
 
             # add shortcut to find people
         QTimer.singleShot(100, delayed)
 
-
+    def update_done_color(self, item):
+        howmany = 0
+        for rubric in self.rubrics:
+            if rubric.assessed(int(item.text(1))):
+                howmany += 1
+        if howmany == 0:
+            item.setForeground(1, Qt.red)
+        elif howmany < len(self.rubrics):
+            item.setForeground(1, Qt.magenta)
+        else:
+            item.setForeground(1, Qt.black)
 
 
     def show(self):
@@ -300,6 +311,7 @@ class MainWindow(QMainWindow):
 
         self.pdf_tree.set_enabled(False)
         if previous is not None:
+            self.update_done_color(previous)
             for rubric in self.rubrics:
                 rubric.push(int(previous.text(1)))
 
@@ -308,6 +320,7 @@ class MainWindow(QMainWindow):
         ratio = self.swik.view.get_ratio()
         rubric = self.rubrics_tabs.currentWidget()
         index = rubric.get_page() if rubric is not None else 0
+
 
         self.swik.open(f"{self.dir_publish}{self.current_exam}.pdf", ratio=ratio, index=index)
 
@@ -326,15 +339,6 @@ class MainWindow(QMainWindow):
 
         self.update_scores_layout()
         self.pdf_tree.set_enabled(True)
-        return
-
-        # for index in range(self.pdf_tree.topLevelItemCount()):
-        #     item = self.pdf_tree.topLevelItem(index)
-        #     exam_id = int(item.text(1))
-        #     if len(self.get_multiple_marks(exam_id)) > 0:
-        #         item.setText(2, "!")
-        #     else:
-        #         item.setText(2, "")
 
 
     def populate_pdf_tree(self):

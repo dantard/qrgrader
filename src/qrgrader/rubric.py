@@ -50,8 +50,8 @@ class Rubric(QListWidget):
 
     def push(self, exam_id):
         if exam_id is not None:
-            self.store(exam_id)
-            self.save_scores()
+            if self.store(exam_id):
+                self.save_scores()
 
     def pull(self, exam_id):
         self.exam_id = exam_id
@@ -402,12 +402,25 @@ class Rubric(QListWidget):
     #     return done
     #
     def store(self, exam_id):
-        if self.scores.get(exam_id) is None:
-            self.scores[exam_id] = {}
+        assessed = False
 
+        # Remove previous scores for this exam_if in case
+        # the exam_id has been "uncorrected"
+        self.scores.pop(exam_id, None)
         for b in self.filter_buttons(StateButton):  # type: Score
-            self.scores[exam_id][b.get_name()] = b.get_state()
-            # b.clear_comment()
+            state = b.get_state()
+            # Only store if a button has been pressed or there is some text
+            if state.get("value", -1) != -1 or state.get("text", "") != "":
+                if self.scores.get(exam_id) is None:
+                    self.scores[exam_id] = {}
+                self.scores[exam_id][b.get_name()] = state
+                assessed = True
+        return assessed
+
+    def assessed(self, exam_id):
+        return self.scores.get(exam_id) is not None
+
+
 
     def retrieve(self, exam_id):
         self.current_exam_id = exam_id

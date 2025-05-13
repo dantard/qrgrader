@@ -266,6 +266,8 @@ class PercentButton(StateButton):
     def get_percent(self):
         return self.percent if self.button.isChecked() else 1
 
+    def get_click_next(self):
+        return False
 
 class MultiplierButton(PercentButton):
 
