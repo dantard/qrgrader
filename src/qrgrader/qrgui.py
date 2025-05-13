@@ -2,12 +2,13 @@ import argparse
 import os
 import sys
 
-from PyQt5.QtCore import Qt, QObject, pyqtSignal
-from PyQt5.QtGui import QPen
-from PyQt5.QtWidgets import QApplication, QInputDialog
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
+from PyQt5.QtGui import QPen, QKeySequence
+from PyQt5.QtWidgets import QApplication, QInputDialog, QShortcut, QProgressDialog
 from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, QSplitter, QGraphicsRectItem, QTabWidget, QLabel, QVBoxLayout, \
     QSizePolicy, QFormLayout, QCheckBox, QGroupBox
 from easyconfig2.easyconfig import EasyConfig2
+from numpy.ma.core import maximum
 from swikv4.widgets.swik_basic_widget import SwikBasicWidget
 
 from qrgrader.utils import makedir
@@ -139,40 +140,62 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(helper)
 
         self.setWindowTitle("QR Grader")
+        self.shortcut = QShortcut(QKeySequence('Ctrl+F'), self)
+        self.shortcut.activated.connect(self.find_people)
+        self.show()
 
-        self.load_tables()
+        files = os.listdir(self.dir_publish)
+        files = [f for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()]
 
-        self.load_detected()
-        self.load_schemas()
+        progress = QProgressDialog("Processing...", "Cancel", 0, 10 + len(files), self)
+        progress.show()
 
-        self.populate_pdf_tree()
-        self.pdf_tree.currentItemChanged.connect(self.pdf_tree_selection_changed)
-        if self.pdf_tree.topLevelItemCount() > 0:
-            self.pdf_tree.setCurrentItem(self.pdf_tree.topLevelItem(0))
+        def delayed():
+            # Show the progress bar
 
-        for index in range(self.pdf_tree.topLevelItemCount()):
-            item = self.pdf_tree.topLevelItem(index)
-            exam_id = int(item.text(1))
-            nia = self.xls_nia.get_nia(exam_id)
-            if len(self.get_multiple_marks(exam_id)) > 0:
-                item.setText(2, "!")
-            elif nia is None or type(nia) == str:
-                item.setText(2, "@")
-            else:
-                item.setText(2, "")
+            self.load_tables()
+            self.load_detected()
+            self.load_schemas()
+            progress.setValue(5)
+            self.populate_pdf_tree()
+            self.pdf_tree.currentItemChanged.connect(self.pdf_tree_selection_changed)
+            progress.setValue(10)
 
-            # if len(self.get_multiple_marks(exam_id)) > 0:
-            #     item.setText(2, "!")
-            # else:
-            #     item.setText(2, "")
+            if self.pdf_tree.topLevelItemCount() > 0:
+                self.pdf_tree.setCurrentItem(self.pdf_tree.topLevelItem(0))
 
+            for index in range(self.pdf_tree.topLevelItemCount()):
+                progress.setValue(10 + index)
+                item = self.pdf_tree.topLevelItem(index)
+                exam_id = int(item.text(1))
+                nia = self.xls_nia.get_nia(exam_id)
+                if len(self.get_multiple_marks(exam_id)) > 0:
+                    item.setText(2, "!")
+                elif nia is None or type(nia) == str:
+                    item.setText(2, "@")
+                else:
+                    item.setText(2, "")
+
+                # if len(self.get_multiple_marks(exam_id)) > 0:
+                #     item.setText(2, "!")
+                # else:
+                #     item.setText(2, "")
+            progress.hide()
+
+            # add shortcut to find people
+        QTimer.singleShot(100, delayed)
+
+
+
+
+    def show(self):
         x, y, w, h, fullscreen = self.cfg_geometry.get()
         if fullscreen:
             self.showFullScreen()
         else:
             self.setGeometry(x, y, w, h)
+        super().show()
 
-        self.show()
 
     def change_nia(self, nia):
         self.xls_nia.set_nia(self.current_exam, nia)
@@ -187,6 +210,20 @@ class MainWindow(QMainWindow):
         else:
             item.setText(2, "")
 
+    def find_people(self):
+        print("si")
+        text, ok = QInputDialog.getText(self, "Find People", "Enter NIA or Name:")
+        if ok:
+            nia = self.xls_data.get_nia_from_name(text)
+            nia = nia or int(text)
+            exam_id = self.xls_nia.get_exam(nia)
+            for index in range(self.pdf_tree.topLevelItemCount()):
+                item = self.pdf_tree.topLevelItem(index)
+                if int(item.text(1)) == exam_id:
+                    self.pdf_tree.setCurrentItem(item)
+                    self.pdf_tree.scrollToItem(item)
+                    break
+
     def closeEvent(self, a0):
         self.cfg_geometry.set(
             [self.geometry().x(), self.geometry().y(), self.geometry().width(), self.geometry().height(),
@@ -199,15 +236,15 @@ class MainWindow(QMainWindow):
     def load_tables(self):
 
         if not self.xls_questions.load():
-            print("ERROR: questions.csv file nos present")
+            print("ERROR: questions.csv file not present")
             sys.exit(1)
 
         if not self.xls_nia.load():
-            print("ERROR: nia.csv file nos present")
+            print("ERROR: nia.csv file not present")
             sys.exit(1)
 
         if not self.xls_data.load():
-            print("WARNING: data.csv file nos present")
+            print("WARNING: data.csv file not present")
 
     def load_schemas(self):
         for filename in self.rubrics_files:

@@ -103,6 +103,7 @@ def compute_similarity_transform(p11, p12, p21, p22):
     R = np.array([[math.cos(theta), -math.sin(theta)],
                   [math.sin(theta), math.cos(theta)]])
 
+    # Scale, rotation, and translation
     return s, R, T
 
 

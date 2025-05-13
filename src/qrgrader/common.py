@@ -117,6 +117,15 @@ class StudentsData:
 
         return by_nia.iloc[0]["GROUP"]
 
+    def get_nia_from_name(self, name):
+        if self.data is None:
+            return None
+        by_name = self.data[self.data["NAME"].str.contains(name, case=False, regex=False)]
+        if by_name.empty:
+            return None
+
+        return by_name.iloc[0]["NIA"]
+
 
 class Nia:
 

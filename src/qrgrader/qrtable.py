@@ -43,7 +43,7 @@ def main():
     nia = Nia(dir_xls + os.sep + str(date) + "_nia.csv")
     nia.load()
 
-    students_data = StudentsData(dir_xls + os.sep + "DATA.csv")
+    students_data = StudentsData(dir_xls + os.sep + "data.csv")
     students_data.load()
 
     questions = Questions(dir_xls + os.sep + str(date) + "_questions.csv")
@@ -113,7 +113,7 @@ def main2():
     nia = Nia(dir_xls + os.sep + str(date) + "_nia.csv")
     nia.load()
 
-    students_data = StudentsData(dir_xls + os.sep + "DATA.csv")
+    students_data = StudentsData(dir_xls + os.sep + "data.csv")
     students_data.load()
 
     questions = Questions(dir_xls + os.sep + str(date) + "_questions.csv")
