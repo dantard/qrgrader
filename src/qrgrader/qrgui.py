@@ -311,7 +311,9 @@ class MainWindow(QMainWindow):
 
         self.pdf_tree.set_enabled(False)
         if previous is not None:
-            self.update_done_color(previous)
+            if len(self.rubrics) > 0:
+                self.update_done_color(previous)
+
             for rubric in self.rubrics:
                 rubric.push(int(previous.text(1)))
 
