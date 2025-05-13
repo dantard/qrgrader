@@ -43,7 +43,7 @@ class EditableLabel(QLabel):
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
-        a, b = QInputDialog.getInt(self, "Edit Value", "Enter new value:", int(self.text()))
+        a, b = QInputDialog.getInt(self, "Edit Value", "Enter new value:", int(self.text().replace("X","0").replace("Y","0")))
         if b:
             self.setText(str(a))
             self.new_value.emit(a)
@@ -177,6 +177,15 @@ class MainWindow(QMainWindow):
     def change_nia(self, nia):
         self.xls_nia.set_nia(self.current_exam, nia)
         self.xls_nia.save()
+        item = self.pdf_tree.currentItem()
+        exam_id = int(item.text(1))
+        nia = self.xls_nia.get_nia(exam_id)
+        if len(self.get_multiple_marks(exam_id)) > 0:
+            item.setText(2, "!")
+        elif nia is None or type(nia) == str:
+            item.setText(2, "@")
+        else:
+            item.setText(2, "")
 
     def closeEvent(self, a0):
         self.cfg_geometry.set(
