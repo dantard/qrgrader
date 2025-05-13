@@ -118,6 +118,8 @@ class Rubric(QListWidget):
         for b in self.filter_buttons(Button):
             buttons[b.get_name()] = b.get_config()
 
+        self.schema_dictionary = buttons
+
         with open(self.schema_filename, "w", encoding='utf-8') as f:
             schema = {"buttons": buttons, "config": self.config}
             yaml.dump(schema, f, sort_keys=False)
@@ -339,11 +341,25 @@ class Rubric(QListWidget):
             widget.set_comment(text)
 
     def duplicate_button(self, position):
+
+        # button = self.get_dialog()
+        #
+        # if button is None:
+        #     return
+        #
+        # # Create Item in ListWidget
+        # item = QListWidgetItem()
+        # self.addItem(item)
+        #
+        # self.setItemWidget(item, button)
+        # item.setSizeHint(button.sizeHint())
+        # self.save_schema()
+
         item = self.item(position)
         widget = self.itemWidget(item)
         name, valid = QInputDialog.getText(self, 'Duplicate', 'Name:', text=widget.get_name() + "_copy")
         if valid:
-            button = widget.__class__(name, **widget.get_config())
+            button = widget.__class__(name, **widget.get_config().copy())
             button.score_changed.connect(self.button_clicked)
             item = QListWidgetItem()
             self.addItem(item)
