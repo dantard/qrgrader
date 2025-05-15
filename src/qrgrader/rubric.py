@@ -3,7 +3,7 @@ import csv
 import os
 
 import yaml
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QDrag, QPixmap, QPainter
 from PyQt5.QtWidgets import (QListWidget,
                              QAbstractItemView, QListWidgetItem, QMenu, QMessageBox,
@@ -17,7 +17,7 @@ class Rubric(QListWidget):
     score_changed = pyqtSignal(object, int)
     goto_next = pyqtSignal()
 
-    def __init__(self, schema_filename, dir_xls):
+    def __init__(self, schema_filename, dir_xls, **kwargs):
         super().__init__()
 
         self.exam_id = None
@@ -30,6 +30,8 @@ class Rubric(QListWidget):
         self.xls_filename = dir_xls + name + ".csv"
         self.current_exam_id = None
         self.modified = False
+        self.buttons_height = kwargs.get("buttons_height")
+        self.buttons_font = kwargs.get("buttons_font")
 
         self.setDragDropMode(QAbstractItemView.InternalMove)
         self.setDragEnabled(True)
@@ -86,6 +88,8 @@ class Rubric(QListWidget):
                 # Create lateral panel and buttons
                 for button_name in self.schema_dictionary:
                     button_config = self.schema_dictionary[button_name]
+                    button_config["height"] = self.buttons_height
+                    button_config["font"] = self.buttons_font
 
                     if button_config.get("type") == 'button':
                         button = StepButton(button_name, **button_config)
@@ -229,7 +233,8 @@ class Rubric(QListWidget):
             if value >= 0:
                 value = value * button.get_full_value() / 100.0
                 points = points + value
-            total = total + button.get_full_value()
+
+            total = total + button.get_full_value() * button.get_weight()
 
         cut = 1
         for button in self.filter_buttons(CutterButton):

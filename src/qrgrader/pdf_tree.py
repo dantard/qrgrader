@@ -28,7 +28,7 @@ class PDFTree(QTreeWidget):
         self.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.header().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.header().sortIndicatorChanged.connect(self.sort)
-        self.setMaximumWidth(200)
+
 
     def sort(self, index, order):
         if index > 0:

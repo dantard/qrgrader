@@ -4,8 +4,8 @@ from qrgrader.code import Code
 
 
 class CodeSet:
-    def __init__(self):
-        self.codes = {}
+    def __init__(self, codes=None):
+        self.codes = {} if codes is None else codes
 
     def append(self, code):
         self.codes[code.data] = code
@@ -33,7 +33,24 @@ class CodeSet:
         return iter(self.codes.values())
 
     def select(self, **kwargs):
+        # chatGPT replaced this
         filtered = [x for x in self.codes.values() if all(getattr(x, key) == value for key, value in kwargs.items())]
+
+        # with this
+        # attrs = kwargs.items()
+        # filtered = []
+        # for x in self.codes.values():
+        #     match = True
+        #     for key, value in attrs:
+        #         if getattr(x, key) != value:
+        #             match = False
+        #             break
+        #     if match:
+        #         filtered.append(x)
+
+        # This also works, but is slightly less efficient
+        # result = CodeSet({code.data: code for code in filtered})
+
         result = CodeSet()
         for code in filtered:
             result.append(code)

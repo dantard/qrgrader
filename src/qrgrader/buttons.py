@@ -11,7 +11,6 @@ class Button(QWidget):
     def get_name(self):
         return self.name
 
-
 class Shortcut(Button):
     clicked = pyqtSignal()
 
@@ -35,6 +34,7 @@ class Shortcut(Button):
 
     def get_config(self):
         return {"type": "shortcut", "buttons": self.buttons, "color": self.styleSheet().split(":")[1]}
+
 
 
 class Separator(Button):
@@ -77,12 +77,26 @@ class TextButton(StateButton):
     def set_state(self, state):
         self.button.setText(state.get("text", ""))
 
+class PushButton(StateButton):
 
-class StepButton(StateButton):
+    def __init__(self,name, **kwargs):
+        super().__init__(name)
+        self.button = QPushButton(name)
+        self.button.setMinimumWidth(10)
+        self.button.setCheckable(True)
+
+        if kwargs.get("height") is not None:
+            self.button.setMinimumHeight(kwargs.get("height"))
+        if kwargs.get("font") is not None:
+            font = self.button.font()
+            font.setPixelSize(int(kwargs.get("font")))
+            self.button.setFont(font)
+
+class StepButton(PushButton):
     score_changed = pyqtSignal()
 
     def __init__(self, name, **kwargs):
-        super().__init__(name)
+        super().__init__(name, **kwargs)
 
         self.weight = kwargs.get('weight', 1)
         self.full_value = kwargs.get('full_value', 1)
@@ -96,14 +110,18 @@ class StepButton(StateButton):
         layout = QHBoxLayout()
         layout.setContentsMargins(5, 2, 5, 2)
 
-        self.button = QPushButton(name)
-        self.button.setMinimumWidth(10)
-        self.button.setCheckable(True)
         if color is not None:
             self.button.setStyleSheet('background-color: {}'.format(color))
         self.button.clicked.connect(self.clicked)
-
         self.spinner = QSpinBox()
+
+        if kwargs.get("height") is not None:
+            self.spinner.setMinimumHeight(kwargs.get("height"))
+        if kwargs.get("font") is not None:
+            font = self.button.font()
+            font.setPixelSize(int(kwargs.get("font")))
+            self.spinner.setFont(font)
+
         self.spinner.setEnabled(False)
         self.spinner.lineEdit().setReadOnly(True)
         self.spinner.setMinimum(0)
@@ -127,6 +145,9 @@ class StepButton(StateButton):
             layout.addWidget(self.spinner)
 
         self.setLayout(layout)
+
+    def get_weight(self):
+        return self.weight
 
     def get_color(self):
         return self.button.styleSheet().split(":")[1].strip()
@@ -231,19 +252,17 @@ class StepButton(StateButton):
         return self.click_next and self.button.isChecked()
 
 
-class PercentButton(StateButton):
+
+class PercentButton(PushButton):
     score_changed = pyqtSignal()
 
     def __init__(self, name, **kwargs):
-        super().__init__(name)
+        super().__init__(name, **kwargs)
 
         self.percent = kwargs.get('percent', 1)
         color = kwargs.get("color", "#D4D4D4")
         self.setLayout(QHBoxLayout())
         self.layout().setContentsMargins(5, 2, 5, 2)
-        self.button = QPushButton(name)
-        self.button.setMinimumWidth(10)
-        self.button.setCheckable(True)
         self.button.setStyleSheet('background-color: {}'.format(color))
         self.button.clicked.connect(self.score_changed.emit)
         self.layout().addWidget(self.button)

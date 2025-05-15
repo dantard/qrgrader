@@ -56,6 +56,8 @@ class MainWindow(QMainWindow):
         makedir(os.path.expanduser("~") + os.sep + ".config/qrgrader/")
         self.config = EasyConfig2(filename=os.path.expanduser("~") + os.sep + ".config/qrgrader/qrgrader.yaml")
         self.cfg_geometry = self.config.root().addPrivate("geometry", default=[0, 0, 1200, 1000, False])
+        self.cfg_buttons_height = self.config.root().addPrivate("buttons_height")
+        self.cfg_buttons_font = self.config.root().addPrivate("buttons_font")
         self.config.load()
 
         self.current_exam = None
@@ -135,7 +137,14 @@ class MainWindow(QMainWindow):
         self.scores_layout.addRow(self.quiz_cb, self.quiz_score_lbl)
         self.scores_layout.addRow("Total: ", self.total_score_lbl)
 
-        self.splitter.addWidget(self.pdf_tree)
+        done_info_helper = QWidget()
+        done_info_helper.setLayout(QVBoxLayout())
+        self.number_assesed_lbl = QLabel("")
+        done_info_helper.layout().addWidget(self.number_assesed_lbl)
+        done_info_helper.layout().addWidget(self.pdf_tree)
+        done_info_helper.setMaximumWidth(280)
+
+        self.splitter.addWidget(done_info_helper)
         self.splitter.addWidget(self.swik)
         self.splitter.addWidget(helper)
 
@@ -154,18 +163,22 @@ class MainWindow(QMainWindow):
 
         def delayed():
             # Show the progress bar
-
+            print("load tables")
             self.load_tables()
+            print("load detected")
             self.load_detected()
+
+            print("load schemas")
             self.load_schemas()
-            progress.setValue(5)
+            progress.setValue(15)
+            print("populate")
             self.populate_pdf_tree()
             self.pdf_tree.currentItemChanged.connect(self.pdf_tree_selection_changed)
-            progress.setValue(10)
+            #sys.exit()
 
             if self.pdf_tree.topLevelItemCount() > 0:
                 self.pdf_tree.setCurrentItem(self.pdf_tree.topLevelItem(0))
-
+            print("populate done")
             for index in range(self.pdf_tree.topLevelItemCount()):
                 progress.setValue(10 + index)
                 item = self.pdf_tree.topLevelItem(index)
@@ -180,6 +193,7 @@ class MainWindow(QMainWindow):
 
                 if len(self.rubrics) > 0:
                     self.update_done_color(item)
+                    self.update_number_assessed()
 
             progress.hide()
 
@@ -198,6 +212,16 @@ class MainWindow(QMainWindow):
         else:
             item.setForeground(1, Qt.black)
 
+    def update_number_assessed(self):
+        rubric = self.rubrics_tabs.currentWidget()
+
+        if rubric is not None:
+            count = 0
+            for index in range(self.pdf_tree.topLevelItemCount()):
+                item = self.pdf_tree.topLevelItem(index)
+                if rubric.assessed(int(item.text(1))):
+                    count += 1
+            self.number_assesed_lbl.setText(f"Done: {count}/{self.pdf_tree.topLevelItemCount()} ({count * 100 / self.pdf_tree.topLevelItemCount():.2f}%)")
 
     def show(self):
         x, y, w, h, fullscreen = self.cfg_geometry.get()
@@ -260,7 +284,7 @@ class MainWindow(QMainWindow):
     def load_schemas(self):
         for filename in self.rubrics_files:
             name = os.path.basename(filename).replace(".scm", "")
-            r1 = Rubric(filename, self.dir_xls)
+            r1 = Rubric(filename, self.dir_xls, buttons_height=self.cfg_buttons_height.get(), buttons_font=self.cfg_buttons_font.get())
             r1.score_changed.connect(self.rubric_score_changed)
             r1.goto_next.connect(self.goto_next)
             self.rubrics_tabs.addTab(r1, name)
@@ -292,6 +316,7 @@ class MainWindow(QMainWindow):
         self.update_pdf_tree_score()
 
     def update_scores_layout(self):
+
         total = 0
         quiz_score = self.get_quiz_score(self.current_exam)
         self.quiz_score_lbl.setText(str(quiz_score))
@@ -313,6 +338,7 @@ class MainWindow(QMainWindow):
         if previous is not None:
             if len(self.rubrics) > 0:
                 self.update_done_color(previous)
+                self.update_number_assessed()
 
             for rubric in self.rubrics:
                 rubric.push(int(previous.text(1)))
@@ -322,6 +348,7 @@ class MainWindow(QMainWindow):
         ratio = self.swik.view.get_ratio()
         rubric = self.rubrics_tabs.currentWidget()
         index = rubric.get_page() if rubric is not None else 0
+
 
 
         self.swik.open(f"{self.dir_publish}{self.current_exam}.pdf", ratio=ratio, index=index)
@@ -348,10 +375,9 @@ class MainWindow(QMainWindow):
         files = sorted([f.replace(".pdf", "") for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()])
 
         for f in files:
-            score = self.get_quiz_score(int(f))
-            item = QTreeWidgetItem(["", f, str(score)])
+            item = QTreeWidgetItem(["", f, ""])
             self.pdf_tree.addTopLevelItem(item)
-
+        print("update scire")
         self.update_all_pdf_tree_scores()
 
     def process_exam(self):
