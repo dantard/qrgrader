@@ -1,5 +1,6 @@
 import argparse
 import os
+import shutil
 import sys
 import time
 from multiprocessing import Manager, Pool, Process
@@ -23,6 +24,7 @@ def main():
 
     parser.add_argument('-B', '--begin', type=int, help='First page to process', default=0)
     parser.add_argument('-E', '--end', type=int, help='Last page to process', default=None)
+    parser.add_argument('-g', '--export', type=str, help='Export project for storage', default=None)
     parser.add_argument('-R', '--ratio', type=int, help='Resize image to save space', default=0.25)
     parser.add_argument('-s', '--scan', help='Process pages in scanned folder', action="store_true")
     parser.add_argument('-d', '--dpi', help='Dot per inch', type=int, default=400)
@@ -48,10 +50,32 @@ def main():
     dir_temp_scanner, _ = get_temp_paths(get_date(), os.getcwd() if args.get("temp") is None else args.get("temp"))
 
     prefix = str(get_date()) + "_"
-
-
-
     ppm = args.get("dpi") / 25.4
+
+    if args.get("export") is not None:
+        path = args.get("export")
+        if not os.path.exists(path):
+            print("ERROR: Export path {} does not exist".format(path))
+            sys.exit(1)
+
+        base_dir = path + os.sep + "qrgrading-" + get_date()
+
+        print("Exporting to {}".format(base_dir))
+
+        makedir(base_dir, clear=True)
+        makedir(base_dir + os.sep + "scanned", clear=True)
+        makedir(base_dir + os.sep + "generated", clear=True)
+        #shutil.copytree("generated", base_dir + os.sep + "generated")
+        shutil.copytree("data", base_dir + os.sep + "data")
+        shutil.copytree("results", base_dir + os.sep + "results")
+        shutil.copytree("source", base_dir + os.sep + "source")
+
+        for item in os.listdir("."):
+            s = os.path.join(".", item)
+            if os.path.isfile(s):
+                shutil.copy2(s, base_dir)
+        sys.exit(0)
+
     if args.get("process"):
         args["scan"] = True
         args["nia"] = True
@@ -278,6 +302,7 @@ def main():
                             annot.set_colors(stroke=(1, 0, 0))
                         annot.update()
             pdf_file.save(filename, incremental=True, encryption=PDF_ENCRYPT_KEEP)
+        print()
 
     print("All done :)")
 

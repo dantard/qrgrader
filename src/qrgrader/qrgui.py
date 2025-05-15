@@ -62,6 +62,8 @@ class MainWindow(QMainWindow):
 
         self.current_exam = None
         self.detected = CodeSet()
+        self.type_a = None
+        self.type_n = None
         self.changed = CodeSet()
 
         # Rubrics
@@ -163,26 +165,27 @@ class MainWindow(QMainWindow):
 
         def delayed():
             # Show the progress bar
-            print("load tables")
             self.load_tables()
-            print("load detected")
             self.load_detected()
-
-            print("load schemas")
             self.load_schemas()
-            progress.setValue(15)
-            print("populate")
+            progress.setValue(10)
+
             self.populate_pdf_tree()
             self.pdf_tree.currentItemChanged.connect(self.pdf_tree_selection_changed)
-            #sys.exit()
 
             if self.pdf_tree.topLevelItemCount() > 0:
                 self.pdf_tree.setCurrentItem(self.pdf_tree.topLevelItem(0))
-            print("populate done")
+
             for index in range(self.pdf_tree.topLevelItemCount()):
                 progress.setValue(10 + index)
                 item = self.pdf_tree.topLevelItem(index)
                 exam_id = int(item.text(1))
+
+                # Update scores
+                score = self.get_full_score(exam_id)
+                item.setText(3, str(score))
+
+                # Check if multiple marks or bad NIA
                 nia = self.xls_nia.get_nia(exam_id)
                 if len(self.get_multiple_marks(exam_id)) > 0:
                     item.setText(2, "!")
@@ -267,6 +270,8 @@ class MainWindow(QMainWindow):
 
     def load_detected(self):
         self.detected.load(self.dir_data + self.prefix + "detected.csv")
+        self.type_a = self.detected.select(type=Code.TYPE_A)
+        self.type_n = self.detected.select(type=Code.TYPE_N)
 
     def load_tables(self):
 
@@ -378,7 +383,7 @@ class MainWindow(QMainWindow):
             item = QTreeWidgetItem(["", f, ""])
             self.pdf_tree.addTopLevelItem(item)
         print("update scire")
-        self.update_all_pdf_tree_scores()
+        #self.update_all_pdf_tree_scores()
 
     def process_exam(self):
         marks = [x for x in self.swik.view.items() if isinstance(x, Mark)]
@@ -388,11 +393,12 @@ class MainWindow(QMainWindow):
             self.swik.view.scene().removeItem(mark)
 
         marks = {}
+        exam_id = self.current_exam % 1000
+
         for index in range(self.swik.renderer.get_document_length()):
-            exam_id = self.current_exam % 1000
-            page_codes = self.detected.select(exam=exam_id, pdf_page=index + 1)
-            type_a = page_codes.select(type=Code.TYPE_A)
-            for code in type_a:
+            page_codes_type_a = self.type_a.select(exam=exam_id, pdf_page=index + 1)
+            #type_a = page_codes.select(type=Code.TYPE_A)
+            for code in page_codes_type_a:
                 r = Mark(code)
                 r.signal.double_click.connect(self.code_clicked)
                 r.setParentItem(self.swik.view.get_page(index))
@@ -403,8 +409,8 @@ class MainWindow(QMainWindow):
                     else:
                         r.setPen(QPen(Qt.red, 2))
 
-            type_n = page_codes.select(type=Code.TYPE_N)
-            for code in type_n:
+            page_codes_type_n = self.type_n.select(exam=exam_id, pdf_page=index + 1)
+            for code in page_codes_type_n:
                 r = Mark(code)
                 r.signal.double_click.connect(self.code_clicked)
                 r.setParentItem(self.swik.view.get_page(index))
@@ -441,7 +447,7 @@ class MainWindow(QMainWindow):
 
     def get_quiz_score(self, exam_id):
         score = 0
-        exam_codes = self.detected.select(exam=exam_id % 1000, type=Code.TYPE_A)
+        exam_codes = self.type_a.select(exam=exam_id % 1000)
         for code in exam_codes:
             if code.marked:
                 score += self.xls_questions.get_value(code.question, code.answer)
@@ -450,7 +456,7 @@ class MainWindow(QMainWindow):
     def get_multiple_marks(self, exam_id):
         yellow = []
         exam_id = exam_id % 1000
-        type_a = self.detected.select(exam=exam_id, type=Code.TYPE_A)
+        type_a = self.type_a.select(exam=exam_id)
         for question in type_a.get_questions():
             answers = type_a.select(question=question)
             marked = sum([1 for x in answers if x.marked])

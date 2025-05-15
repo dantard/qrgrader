@@ -34,19 +34,19 @@ class CodeSet:
 
     def select(self, **kwargs):
         # chatGPT replaced this
-        filtered = [x for x in self.codes.values() if all(getattr(x, key) == value for key, value in kwargs.items())]
+        # filtered = [x for x in self.codes.values() if all(getattr(x, key) == value for key, value in kwargs.items())]
 
-        # with this
-        # attrs = kwargs.items()
-        # filtered = []
-        # for x in self.codes.values():
-        #     match = True
-        #     for key, value in attrs:
-        #         if getattr(x, key) != value:
-        #             match = False
-        #             break
-        #     if match:
-        #         filtered.append(x)
+        # with this for efficiency
+        attrs = kwargs.items()
+        filtered = []
+        for x in self.codes.values():
+            match = True
+            for key, value in attrs:
+                if getattr(x, key) != value:
+                    match = False
+                    break
+            if match:
+                filtered.append(x)
 
         # This also works, but is slightly less efficient
         # result = CodeSet({code.data: code for code in filtered})
