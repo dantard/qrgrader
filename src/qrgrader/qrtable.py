@@ -63,18 +63,25 @@ def main():
     inserted += 1
 
     # Insert the GRADE column
-    raw.insert(inserted + 2, "GRADE", '=SUMPRODUCT(INDIRECT(ADDRESS(ROW(), COLUMN() + 1) & ":" '
-                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1))), INDIRECT(ADDRESS(4, COLUMN() + 1) & ":" '
+    raw.insert(inserted + 2, "T", '=SUMPRODUCT(INDIRECT(ADDRESS(ROW(), COLUMN() + 1) & ":" '
+                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1))) * INDIRECT(ADDRESS(4, COLUMN() + 1) & ":" '
                                       '& ADDRESS(4, COLUMNS($A$1:$1))))')
-    inserted += 1
+    raw.insert(inserted + 2, "O", '=SUMPRODUCT(($G$3:$3="O") * INDIRECT(ADDRESS(ROW(), COLUMN() + 2) & ":" '
+                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 2) & ":" '
+                                      '& ADDRESS(4, COLUMNS($A$1:$1))))')
+    raw.insert(inserted + 2, "Q", '=SUMPRODUCT(($G$3:$3<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" '
+                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" '
+                                      '& ADDRESS(4, COLUMNS($A$1:$1))))')
+
+    inserted += 3
 
     # Fill the header
     percent_answ = '=SUM(OFFSET(INDIRECT("RC", FALSE), 1, 0, ROWS(A:A)-ROW(), 1))/COUNT(OFFSET(INDIRECT("RC", FALSE), 1, 0, ROWS(A:A)-ROW(), 1))'
     percent_ques = ('=SUM(OFFSET(INDIRECT("RC", FALSE), ' + str(hdr) + ', -3, ROWS(A:A) - ROW()-4, 4))/COUNT(OFFSET(INDIRECT("RC", FALSE), '
                     + str(hdr) + ', 0, ROWS(A:A)-ROW(), 1))')
 
-    names, qn, ans_letter, ans_value, ans_perc = [""] * (inserted + 2), [""] * (inserted + 2), [""] * (inserted + 2), [""] * (inserted + 2), [""] * (
-            inserted + 2)
+    names, qn, ans_letter, ans_value = [""] * (inserted + 2), [""] * (inserted + 2), [""] * (inserted + 2), [""] * (inserted + 2)
+    ans_perc = ["Exam ID", "#", "NIA", "Q", "O", "T"]
 
     for question in questions.get_questions():
         if questions.get_type(question) == "Q":
@@ -89,6 +96,8 @@ def main():
             ans_letter.append("O")
             ans_value.append(questions.get_value(question, 1))
             ans_perc.append(percent_ques)
+
+    #print(raw.shape, len(names), len(qn), len(ans_letter), len(ans_value), len(ans_perc))
 
     raw.loc[-5] = names
     raw.loc[-4] = qn

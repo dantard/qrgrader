@@ -270,6 +270,9 @@ class MainWindow(QMainWindow):
 
     def load_detected(self):
         self.detected.load(self.dir_data + self.prefix + "detected.csv")
+        # Pre-select codes to improve performance
+        # type_a and type_n contain the codes pointer so
+        # any modification in them will be reflected in detected
         self.type_a = self.detected.select(type=Code.TYPE_A)
         self.type_n = self.detected.select(type=Code.TYPE_N)
 
@@ -382,8 +385,9 @@ class MainWindow(QMainWindow):
         for f in files:
             item = QTreeWidgetItem(["", f, ""])
             self.pdf_tree.addTopLevelItem(item)
-        print("update scire")
-        #self.update_all_pdf_tree_scores()
+
+        # Not updating the scores here, as it is done somewhere else
+        # self.update_all_pdf_tree_scores()
 
     def process_exam(self):
         marks = [x for x in self.swik.view.items() if isinstance(x, Mark)]

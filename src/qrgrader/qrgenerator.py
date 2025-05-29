@@ -26,6 +26,7 @@ def main():
     parser.add_argument('-q', '--questions', help='Generate questions csv', action='store_true')
     parser.add_argument('-g', '--generated', help='Generate questions csv', action='store_true')
     parser.add_argument('-v', '--verbose', help='Extra verbosity', action='store_true')
+    parser.add_argument('-a', '--append', help='Generate additional exams', action='store_true')
     args = vars(parser.parse_args())
 
     if not check_workspace():
@@ -56,9 +57,9 @@ def main():
         print("WARNING: With -P option qrgenerator may generate up to {} more exams than needed.".format(threads))
 
     if number > 0:
-
-        makedir(dir_generated, clear=True)
-        makedir(dir_temp_generator, clear=True)
+        clear = not args.get("append")
+        makedir(dir_generated, clear=clear)
+        makedir(dir_temp_generator, clear=clear)
 
         if filename is None:
             source = dir_source
@@ -82,8 +83,13 @@ def main():
 
             i = begin
 
-            while i < end and len(os.listdir(dir_generated)) < number:
+            while i < end and len(os.listdir(dir_generated)) < number + begin - 1:
                 queue.acquire()
+
+                procs = [p for p in processes if not p.is_alive()].copy()
+                for process in procs:
+                    process.join()
+                    processes.remove(process)
 
                 print("Creating exam {}{:03d} ({:d} ready)".format(date, i, len(os.listdir(dir_generated))))
                 p = Generator(queue, filename, "{}{:03d}".format(date, i),
@@ -99,6 +105,7 @@ def main():
 
             for p in processes:
                 p.join()
+            processes.clear()
 
             print("Done ({:d} exams generated).".format(len(os.listdir(dir_generated))))
 

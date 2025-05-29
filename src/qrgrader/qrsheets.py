@@ -12,8 +12,11 @@ from qrgrader.utils import makedir
 
 from qrgrader.gdrive import GDrive, Sheets
 
-client_secrets_json = '''{
-}'''
+client_secrets_json = '''
+{
+
+}
+'''
 
 
 def main():

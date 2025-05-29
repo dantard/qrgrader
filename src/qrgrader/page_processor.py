@@ -14,12 +14,13 @@ from qrgrader.utils import pix2np, get_patches, threshold, get_codes, compute_si
 
 class PageProcessor(Process):
 
-    def __init__(self, filename, index, generated, result, **kwargs):
+    def __init__(self, semaphore, filename, index, generated, result, **kwargs):
         super().__init__()
         self.filename = filename
         self.index = index
         self.generated = generated
         self.result = result
+        self.semaphore = semaphore
 
         self.dpi = kwargs.get("dpi", 400)
         self.thresholds = kwargs.get("thresholds", [50, 55, 60, 65, 70, 75, 80])
@@ -166,4 +167,5 @@ class PageProcessor(Process):
             code.set_marked(detected.get(code) is None)
             self.result.append(code)
 
-        print("Processed", self.filename, "page", self.index, len(self.result))
+        print(f"Processed {os.path.basename(self.filename)} page {self.index} ({len(generated_page_codeset)} codes detected)")
+        self.semaphore.release()

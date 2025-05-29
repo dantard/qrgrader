@@ -39,6 +39,7 @@ def main():
     parser.add_argument('-z', '--zoom', help='Specify printer zoom', type=float, default=1.0)
     parser.add_argument('-x', '--xdisp', help='Specify printer X displacement', type=float, default=0.0)
     parser.add_argument('-y', '--ydisp', help='Specify printer Y displacement', type=float, default=0.0)
+    parser.add_argument('-j', '--threads', help='Number of threads to be used for processing', type=int, default=4)
 
     args = vars(parser.parse_args())
 
@@ -177,32 +178,35 @@ def main():
 
             processes = []
             detected = manager.list()
+            semaphore = manager.BoundedSemaphore(args.get("threads"))
 
             files = [x for x in os.listdir(dir_scanned) if x.endswith(".pdf")]
-            for filename in files:
-                #print("Processing file {}".format(filename))
+            for i, filename in enumerate(files):
+                print(f"*** Processing file {filename} ({i+1}/{len(files)})")
                 document = pymupdf.open(dir_scanned + filename)
                 last_page = args.get("end") if args.get("end") is not None else len(document)
                 document.close()
 
                 for i in range(args.get("begin"), last_page):
 
-                    # We send the filename and open the document in the process for three reasons:
-                    # 1. Sending the page object is not possible because it is not pickable
-                    # 2. Rendering the page image in parallel make the whole process much faster
-                    # 3. For some reason sending the image to the process creates memory overflow
+                    semaphore.acquire()
 
                     procs = [p for p in processes if not p.is_alive()].copy()
                     for process in procs:
                         process.join()
                         processes.remove(process)
 
-                    process = PageProcessor(dir_scanned + filename, i, generated, detected, dir_images=dir_temp_scanner, resize=args.get("ratio"))
+                    # We send the filename and open the document in the process for three reasons:
+                    # 1. Sending the page object is not possible because it is not pickable
+                    # 2. Rendering the page image in parallel make the whole process much faster
+                    # 3. For some reason sending the image to the process creates memory overflow
+
+                    process = PageProcessor(semaphore, dir_scanned + filename, i, generated, detected, dir_images=dir_temp_scanner, resize=args.get("ratio"))
                     processes.append(process)
                     process.start()
 
-                    while len([p for p in processes if p.is_alive()]) >= 4:
-                        time.sleep(0.25)
+                    #while len([p for p in processes if p.is_alive()]) >= 4:
+                    #    time.sleep(0.25)
 
 
             for process in processes:
@@ -236,13 +240,15 @@ def main():
 
     if args.get("nia"):
         print("Creating NIA xls file")
+        type_n = codes.select(type=Code.TYPE_N)
         with open(dir_xls + prefix + "nia.csv", "w", encoding='utf-8') as f:
             f.write("EXAM\tNIA\n")
             for exam in exams:
                 nia = {0: 'Y', 1: 'Y', 2: 'Y', 3: 'Y', 4: 'Y', 5: 'Y'}
+                exam_codes = type_n.select(exam=exam)
                 for row in range(6):
                     for number in range(10):
-                        result = codes.first(exam=exam, type=Code.TYPE_N, number=row * 10 + number)
+                        result = exam_codes.first(number=row * 10 + number)
                         if result is None or result.marked:
                             nia[row] = number if nia[row] == 'Y' else 'X'
                 nia = "".join([str(x) for x in nia.values()])
@@ -262,14 +268,25 @@ def main():
             # f.write(line + "\n")
 
             # Exams
+            type_a = codes.select(type=Code.TYPE_A)
+            type_o = codes.select(type=Code.TYPE_O)
+            questions = type_a.get_questions()
+            answers = type_a.get_answers()
+            openq = type_o.get_open()
+
+            # print("questions: {}".format(questions))
+            # print("answers: {}".format(answers))
+            # print("openq: {}".format(openq))
+
             for exam in exams:
+                exam_codes = type_a.select(exam=exam)
                 line = f"{date}\t{exam}"
-                for question in codes.get_questions():
-                    for answer in codes.get_answers():
-                        result = codes.first(exam=exam, type=Code.TYPE_A, question=question, answer=answer)
+                for question in questions:
+                    for answer in answers:
+                        result = exam_codes.first(question=question, answer=answer)
                         line += "\t1" if result is None or result.marked else "\t0"
 
-                for open_questions in codes.get_open():
+                for _ in openq:
                     line += "\t0"
                 f.write(line + "\n")
 
