@@ -206,7 +206,7 @@ def main():
 
             for index, filename, length in files:
                 index > 0 and print() # for the \r at the end of the last line
-                print(f"*** Processing file {filename} ({index+1}/{len(files)})")
+                print(f">> Processing file {filename} ({index+1}/{len(files)})")
                 last_page = args.get("end") if args.get("end") is not None else length
 
                 for i in range(first_page, last_page):
@@ -230,7 +230,7 @@ def main():
 
                     #while len([p for p in processes if p.is_alive()]) >= 4:
                     #    time.sleep(0.25)
-                    print(f"Processed {done}/{total_length} ({100*done/total_length:.2f}%) ({len(detected)} codes found)", end="\r")
+                    print(f"   Processed {done}/{total_length} ({100*done/total_length:.2f}%) ({len(detected)} codes found)", end="\r")
 
             print() # for the \r at the end of the last line
 
@@ -251,7 +251,7 @@ def main():
         date = codes.get_date()
 
     if args.get("reconstruct"):
-        print("Reconstructing exams")
+        print(">> Reconstructing exams")
         images = os.listdir(dir_temp_scanner)
         for exam in exams:
             filename = dir_publish + "{}{:03d}.pdf".format(date, exam)
@@ -265,7 +265,7 @@ def main():
 
     if args.get("nia"):
         nia_filename = dir_xls + prefix + "nia.csv"
-        print(f"Creating {os.path.basename(nia_filename)} file")
+        print(f">> Creating {os.path.basename(nia_filename)} file")
         type_n = codes.select(type=Code.TYPE_N)
         with open(nia_filename, "w", encoding='utf-8') as f:
             f.write("EXAM\tNIA\n")
@@ -283,7 +283,7 @@ def main():
 
     if args.get("raw"):
         raw_filename = dir_xls + prefix + "raw.csv"
-        print(f"Creating {os.path.basename(raw_filename)} file")
+        print(f">> Creating {os.path.basename(raw_filename)} file")
         with open(raw_filename, "w", encoding='utf-8') as f:
             # # Header
             # line = "DATE\tEXAM"
@@ -318,7 +318,7 @@ def main():
                 f.write(line + "\n")
     if args.get("table"):
         table_filename = dir_xls + prefix + "table.csv"
-        print(f"Creating {os.path.basename(table_filename)} file")
+        print(f">> Creating {os.path.basename(table_filename)} file")
 
         nia = Nia(dir_xls + prefix + "nia.csv")
         nia.load()
@@ -393,13 +393,14 @@ def main():
 
 
     if args.get("annotate"):
+        print(">> Annotating exams")
         questions = Questions(dir_xls + prefix + "questions.csv")
         if not questions.load():
             print(f"ERROR: file {os.path.basename(dir_xls + prefix + 'questions.csv')} not found")
             sys.exit(1)
 
         for exam in exams:
-            print("Annotating exam {}".format(exam), end="\r")
+            print("   Annotating exam {}".format(exam), end="\r")
             filename = dir_publish + "{}{:03d}.pdf".format(date, exam)
             pdf_file = pymupdf.open(filename)
             for page in pdf_file:
