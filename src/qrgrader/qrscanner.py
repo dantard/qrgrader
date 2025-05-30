@@ -7,6 +7,7 @@ from multiprocessing import Manager, Pool, Process
 from random import randint
 
 import cv2
+import pandas as pd
 import pymupdf
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtWidgets import QGraphicsRectItem
@@ -14,7 +15,8 @@ from pymupdf.mupdf import PDF_ENCRYPT_KEEP
 
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet, PageCodeSet
-from qrgrader.common import check_workspace, get_workspace_paths, get_temp_paths, Generated, Questions, get_date
+from qrgrader.common import check_workspace, get_workspace_paths, get_temp_paths, Generated, Questions, get_date, Nia, \
+    StudentsData
 from qrgrader.page_processor import PageProcessor
 from qrgrader.utils import makedir
 
@@ -22,24 +24,27 @@ from qrgrader.utils import makedir
 def main():
     parser = argparse.ArgumentParser(description='Patching and detection')
 
+    parser.add_argument('-a', '--annotate', help='Annotate files', action="store_true")
     parser.add_argument('-B', '--begin', type=int, help='First page to process', default=0)
+    parser.add_argument('-c', '--correct', help='Correct QRs position (according to -x -y and -z)', action="store_true")
+    parser.add_argument('-d', '--dpi', help='Dot per inch', type=int, default=400)
+    parser.add_argument('-e', '--reconstruct', help='Reconstruct exams', action="store_true")
     parser.add_argument('-E', '--end', type=int, help='Last page to process', default=None)
     parser.add_argument('-g', '--export', type=str, help='Export project for storage', default=None)
-    parser.add_argument('-R', '--ratio', type=int, help='Resize image to save space', default=0.25)
-    parser.add_argument('-s', '--scan', help='Process pages in scanned folder', action="store_true")
-    parser.add_argument('-d', '--dpi', help='Dot per inch', type=int, default=400)
-    parser.add_argument('-a', '--annotate', help='Annotate files', action="store_true")
+    parser.add_argument('-j', '--threads', help='Number of threads to be used for processing', type=int, default=4)
     parser.add_argument('-n', '--nia', help='Create NIA file', action="store_true")
+    parser.add_argument('-p', '--process', help='Options -sne', action="store_true")
+    parser.add_argument('-q', '--postprocess', help='Options -nrta', action="store_true")
+    parser.add_argument('-R', '--ratio', type=int, help='Resize image to save space', default=0.25)
     parser.add_argument('-r', '--raw', help='Create RAW file', action="store_true")
-    parser.add_argument('-c', '--correct', help='Correct QRs position (according to -x -y and -z)', action="store_true")
+    parser.add_argument('-s', '--scan', help='Process pages in scanned folder', action="store_true")
     parser.add_argument('-S', '--simulate', help='Create random marked files', type=int, default=0)
-    parser.add_argument('-e', '--reconstruct', help='Reconstruct exams', action="store_true")
-    parser.add_argument('-p', '--process', help='Options -snre', action="store_true")
+    parser.add_argument('-t', '--table', help='Generate table',action="store_true")
     parser.add_argument('-T', '--temp', help='Specify temp directory', type=str, default="/tmp")
-    parser.add_argument('-z', '--zoom', help='Specify printer zoom', type=float, default=1.0)
     parser.add_argument('-x', '--xdisp', help='Specify printer X displacement', type=float, default=0.0)
     parser.add_argument('-y', '--ydisp', help='Specify printer Y displacement', type=float, default=0.0)
-    parser.add_argument('-j', '--threads', help='Number of threads to be used for processing', type=int, default=4)
+    parser.add_argument('-z', '--zoom', help='Specify printer zoom', type=float, default=1.0)
+
 
     args = vars(parser.parse_args())
 
@@ -52,6 +57,7 @@ def main():
 
     prefix = str(get_date()) + "_"
     ppm = args.get("dpi") / 25.4
+    ws_date = get_date()
 
     if args.get("export") is not None:
         path = args.get("export")
@@ -80,8 +86,13 @@ def main():
     if args.get("process"):
         args["scan"] = True
         args["nia"] = True
-        args["raw"] = True
         args["reconstruct"] = True
+
+    if args.get("postprocess"):
+        args["nia"] = True
+        args["raw"] = True
+        args["table"] = True
+        args["annotate"] = True
 
     zoom = args.get("zoom", 1.0)
     xdisp = args.get("xdisp", 0.0)
@@ -90,7 +101,7 @@ def main():
     if args.get("correct") > 0:
         codes = CodeSet()
         if not codes.load(dir_data + prefix + "detected.csv"):
-            print("ERROR: detected.csv not found")
+            print(f"ERROR: file {os.path.basename(dir_data + prefix + 'detected.csv')} not found")
             sys.exit(1)
 
         for code in codes:
@@ -110,7 +121,7 @@ def main():
         generated = Generated(72 / 25.4)
 
         if not generated.load(dir_data + prefix + "generated.csv"):
-            print("ERROR: generated.csv not found")
+            print(f"ERROR: file {os.path.basename(dir_data + prefix + 'generated.csv')} not found")
             sys.exit(1)
 
         pdf_filenames = [f for f in os.listdir(dir_generated) if f.endswith(".pdf")]
@@ -166,28 +177,39 @@ def main():
         print("\nSimulation done.")
 
     if args.get("scan", False):
+        first_page = args.get("begin")
 
         os.makedirs(dir_temp_scanner, exist_ok=True)
 
         generated = Generated(ppm)
         if not generated.load(dir_data + prefix + "generated.csv"):
-            print("ERROR: generated.csv not found")
+            print(f"ERROR: file {os.path.basename(dir_data + prefix + 'generated.csv')} not found")
             sys.exit(1)
+
+        files = []
+        for i, filename in enumerate([x for x in os.listdir(dir_scanned) if x.endswith(".pdf")]):
+            document = pymupdf.open(dir_scanned + filename)
+            files.append((i, filename, len(document)))
+            document.close()
+        total_length = sum(length-first_page for _, _, length in files)
+
+        if total_length <=0:
+            print("No pages to process. Exiting.")
+            sys.exit(0)
 
         with Manager() as manager:
 
+            done = 0
             processes = []
             detected = manager.list()
             semaphore = manager.BoundedSemaphore(args.get("threads"))
 
-            files = [x for x in os.listdir(dir_scanned) if x.endswith(".pdf")]
-            for i, filename in enumerate(files):
-                print(f"*** Processing file {filename} ({i+1}/{len(files)})")
-                document = pymupdf.open(dir_scanned + filename)
-                last_page = args.get("end") if args.get("end") is not None else len(document)
-                document.close()
+            for index, filename, length in files:
+                index > 0 and print() # for the \r at the end of the last line
+                print(f"*** Processing file {filename} ({index+1}/{len(files)})")
+                last_page = args.get("end") if args.get("end") is not None else length
 
-                for i in range(args.get("begin"), last_page):
+                for i in range(first_page, last_page):
 
                     semaphore.acquire()
 
@@ -195,6 +217,7 @@ def main():
                     for process in procs:
                         process.join()
                         processes.remove(process)
+                        done += 1
 
                     # We send the filename and open the document in the process for three reasons:
                     # 1. Sending the page object is not possible because it is not pickable
@@ -207,7 +230,9 @@ def main():
 
                     #while len([p for p in processes if p.is_alive()]) >= 4:
                     #    time.sleep(0.25)
+                    print(f"Processed {done}/{total_length} ({100*done/total_length:.2f}%) ({len(detected)} codes found)", end="\r")
 
+            print() # for the \r at the end of the last line
 
             for process in processes:
                 process.join()
@@ -219,7 +244,7 @@ def main():
     if args.get("reconstruct") or args.get("nia") or args.get("raw") or args.get("annotate"):
         codes = CodeSet()
         if not codes.load(dir_data + prefix + "detected.csv"):
-            print("ERROR: detected.csv not found")
+            print(f"ERROR: file {os.path.basename(dir_data + prefix + 'detected.csv')} not found")
             sys.exit(1)
 
         exams = codes.get_exams()
@@ -239,9 +264,10 @@ def main():
             pdf_file.save(filename)
 
     if args.get("nia"):
-        print("Creating NIA xls file")
+        nia_filename = dir_xls + prefix + "nia.csv"
+        print(f"Creating {os.path.basename(nia_filename)} file")
         type_n = codes.select(type=Code.TYPE_N)
-        with open(dir_xls + prefix + "nia.csv", "w", encoding='utf-8') as f:
+        with open(nia_filename, "w", encoding='utf-8') as f:
             f.write("EXAM\tNIA\n")
             for exam in exams:
                 nia = {0: 'Y', 1: 'Y', 2: 'Y', 3: 'Y', 4: 'Y', 5: 'Y'}
@@ -256,8 +282,9 @@ def main():
                 f.write("{}\t{}\n".format(date * 1000 + exam, nia))
 
     if args.get("raw"):
-        print("Creating RAW xls file")
-        with open(dir_xls + prefix + "raw.csv", "w", encoding='utf-8') as f:
+        raw_filename = dir_xls + prefix + "raw.csv"
+        print(f"Creating {os.path.basename(raw_filename)} file")
+        with open(raw_filename, "w", encoding='utf-8') as f:
             # # Header
             # line = "DATE\tEXAM"
             # for qn in codes.get_questions():
@@ -289,11 +316,86 @@ def main():
                 for _ in openq:
                     line += "\t0"
                 f.write(line + "\n")
+    if args.get("table"):
+        table_filename = dir_xls + prefix + "table.csv"
+        print(f"Creating {os.path.basename(table_filename)} file")
+
+        nia = Nia(dir_xls + prefix + "nia.csv")
+        nia.load()
+
+        students_data = StudentsData(dir_xls + os.sep + "data.csv")
+        students_data.load()
+
+        questions = Questions(dir_xls + os.sep + str(ws_date) + "_questions.csv")
+        questions.load()
+
+        raw = pd.read_csv(dir_xls + os.sep + str(ws_date) + "_raw.csv", sep='\t', header=None)
+        raw.iloc[:, 0] = raw.iloc[:, 0] * 1000 + raw.iloc[:, 1]
+        raw.set_index(raw.iloc[:, 0], inplace=True)
+
+        hdr = 4  # Number of header rows
+        inserted = 0
+
+        # Insert the NIA column
+        raw.insert(inserted + 2, "NIA", "")
+        for exam_id in raw.iloc[:, 0].tolist():
+            raw.loc[exam_id, "NIA"] = nia.get_nia(exam_id)
+        inserted += 1
+
+        # Insert the GRADE column
+        raw.insert(inserted + 2, "T", '=SUMPRODUCT(INDIRECT(ADDRESS(ROW(), COLUMN() + 1) & ":" '
+                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1))) * INDIRECT(ADDRESS(4, COLUMN() + 1) & ":" '
+                                      '& ADDRESS(4, COLUMNS($A$1:$1))))')
+        raw.insert(inserted + 2, "O", '=SUMPRODUCT(($G$3:$3="O") * INDIRECT(ADDRESS(ROW(), COLUMN() + 2) & ":" '
+                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 2) & ":" '
+                                      '& ADDRESS(4, COLUMNS($A$1:$1))))')
+        raw.insert(inserted + 2, "Q", '=SUMPRODUCT(($G$3:$3<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" '
+                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" '
+                                      '& ADDRESS(4, COLUMNS($A$1:$1))))')
+
+        inserted += 3
+
+        # Fill the header
+        percent_answ = '=SUM(OFFSET(INDIRECT("RC", FALSE), 1, 0, ROWS(A:A)-ROW(), 1))/COUNT(OFFSET(INDIRECT("RC", FALSE), 1, 0, ROWS(A:A)-ROW(), 1))'
+        percent_ques = ('=SUM(OFFSET(INDIRECT("RC", FALSE), ' + str(
+            hdr) + ', -3, ROWS(A:A) - ROW()-4, 4))/COUNT(OFFSET(INDIRECT("RC", FALSE), '
+                        + str(hdr) + ', 0, ROWS(A:A)-ROW(), 1))')
+
+        names, qn, ans_letter, ans_value = [""] * (inserted + 2), [""] * (inserted + 2), [""] * (inserted + 2), [
+            ""] * (inserted + 2)
+        ans_perc = ["Exam ID", "#", "NIA", "Q", "O", "T"]
+
+        for question in questions.get_questions():
+            if questions.get_type(question) == "Q":
+                names.extend([questions.get_text(question), "", "", percent_ques])
+                qn.extend([question, question, question, question])
+                ans_value.extend([questions.get_value(question, i + 1) for i in range(4)])
+                ans_letter.extend([chr(65 + i) for i in range(4)])
+                ans_perc.extend([percent_answ] * 4)
+            else:
+                names.append(questions.get_text(question))
+                qn.append(question)
+                ans_letter.append("O")
+                ans_value.append(questions.get_value(question, 1))
+                ans_perc.append(percent_ques)
+
+        # print(raw.shape, len(names), len(qn), len(ans_letter), len(ans_value), len(ans_perc))
+
+        raw.loc[-5] = names
+        raw.loc[-4] = qn
+        raw.loc[-3] = ans_letter
+        raw.loc[-2] = ans_value
+        raw.loc[-1] = ans_perc
+
+        df = raw.sort_index().reset_index(drop=True)
+
+        df.to_csv(table_filename, sep='\t', index=False, header=False)
+
 
     if args.get("annotate"):
         questions = Questions(dir_xls + prefix + "questions.csv")
         if not questions.load():
-            print("ERROR: questions.csv not found")
+            print(f"ERROR: file {os.path.basename(dir_xls + prefix + 'questions.csv')} not found")
             sys.exit(1)
 
         for exam in exams:

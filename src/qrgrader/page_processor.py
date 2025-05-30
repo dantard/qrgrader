@@ -167,5 +167,5 @@ class PageProcessor(Process):
             code.set_marked(detected.get(code) is None)
             self.result.append(code)
 
-        print(f"Processed {os.path.basename(self.filename)} page {self.index} ({len(generated_page_codeset)} codes detected)")
+        #print(f"Processed {os.path.basename(self.filename)} page {self.index} ({len(generated_page_codeset)} codes detected)")
         self.semaphore.release()

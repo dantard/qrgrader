@@ -40,7 +40,7 @@ class Rubric(QListWidget):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.setMinimumWidth(115)
 
-        # self.schemaChanged.connect(self.save_schema) # type: ignore
+        self.schemaChanged.connect(self.save_schema) # type: ignore
         self.customContextMenuRequested.connect(self.button_list_right_click)
         self.populate()
         self.load_scores()

@@ -183,7 +183,7 @@ class MainWindow(QMainWindow):
 
                 # Update scores
                 score = self.get_full_score(exam_id)
-                item.setText(3, str(score))
+                item.setText(3, str(round(score,2)))
 
                 # Check if multiple marks or bad NIA
                 nia = self.xls_nia.get_nia(exam_id)
@@ -439,14 +439,14 @@ class MainWindow(QMainWindow):
         for index in range(self.pdf_tree.topLevelItemCount()):
             item = self.pdf_tree.topLevelItem(index)
             score = self.get_full_score(int(item.text(1)))
-            item.setText(3, str(score))
+            item.setText(3, str(round(score,2)))
 
     def update_pdf_tree_score(self):
         for index in range(self.pdf_tree.topLevelItemCount()):
             item = self.pdf_tree.topLevelItem(index)
             if int(item.text(1)) == self.current_exam:
                 score = self.get_full_score(self.current_exam)
-                item.setText(3, str(score))
+                item.setText(3, str(round(score,2)))
                 break
 
     def get_quiz_score(self, exam_id):

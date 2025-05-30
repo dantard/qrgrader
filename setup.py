@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='qrgrader',
-    version='0.0.12',
+    version='0.0.15',
     packages=find_packages(where='src'),  # Specify src directory
     package_dir={'': 'src'},  # Tell setuptools that packages are under src
     install_requires=[
@@ -18,7 +18,7 @@ setup(
     ],
     author='Danilo Tardioli',
     author_email='dantard@unizar.es',
-    description='A framwork for automatic grading of exams using QR codes',
+    description='A framework for automatic grading of exams using QR codes',
     long_description=open('README.md', encoding='utf-8').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/dantard/qrgrader',
