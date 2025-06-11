@@ -2,6 +2,7 @@
 import csv
 import os
 
+import gspread.utils
 import yaml
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QDrag, QPixmap, QPainter
@@ -259,26 +260,80 @@ class Rubric(QListWidget):
     def save_xls(self):
 
         with open(self.xls_filename, "w", encoding='utf-8') as f:
-            row = "EXAM_ID"
-            for button_name, _ in self.schema_dictionary.items():
+            filtered = {
+                name: config
+                for name, config in self.schema_dictionary.items()
+                if config.get("type") not in ['separator', 'shortcut']
+            }
+
+            # HEADER
+            row = "EXAM_ID\tSCORE"
+            for button_name, button_config in filtered.items():
                 row += "\t" + button_name
 
             f.write(row + "\n")
 
-            row = " "
-            for button_name, button_config in self.schema_dictionary.items():
+            # SCORES
+            row = " \t "
+            for button_name, button_config in filtered.items():
                 if button_config.get("type") == 'button':
                     row += "\t" + "{:.2f}".format(button_config.get("full_value", 1))
                 elif button_config.get("type") == 'text':
                     row += "\t "
                 else:
-                    row += "\t?"
+                    row += "\t" + "{:.2f}".format(button_config.get("percent", 1))
 
             f.write(row + "\n")
 
+
+            col = 3
+            cutter = []
+            multipliers = []
+            normal = []
+
+            for button_name, button_config in filtered.items():
+                if button_config.get("type") == 'multiplier':
+                    multipliers.append(col)
+                elif button_config.get("type") == 'button':
+                    normal.append(col)
+                elif button_config.get("type") == 'cutter':
+                    cutter.append(col)
+                col += 1
+
+            print(multipliers)
+
+            # Sort scores by exam_id
+            self.scores = dict(sorted(self.scores.items()))
+
+            # VALUES
+            current_row = 2
             for exam_id, exam_score_items in self.scores.items():
+                current_row += 1
+
                 row = str(exam_id)
-                for button_name, button_config in self.schema_dictionary.items():
+                suma = "SUMIF({0"
+                row2 = "(0"
+                for col in normal:
+                    full_value = gspread.utils.rowcol_to_a1(2, col)
+                    value = gspread.utils.rowcol_to_a1(current_row, col)
+                    row2 += "+" + full_value + "*" + value
+                    suma += "," + full_value
+                suma = suma + '},">0")'
+                row2 += ")/" + suma
+
+
+                for col in multipliers:
+                    percent = gspread.utils.rowcol_to_a1(2, col)
+                    value = gspread.utils.rowcol_to_a1(current_row, col)
+                    row2 += "*IF("+value+"=0,1,"+percent+")"
+
+                for col in cutter:
+                    percent = gspread.utils.rowcol_to_a1(2, col)
+                    value = gspread.utils.rowcol_to_a1(current_row, col)
+                    row2 = "if(" + value + " = 0,"+ row2 +", min("+row2+","+percent+"))" #" + percent + "*" + suma + "))"
+
+                row += "\t=" + row2
+                for button_name, button_config in filtered.items():
 
                     button_type = button_config.get("type")
                     button_state = exam_score_items.get(button_name)  # value and comment or text
@@ -290,7 +345,7 @@ class Rubric(QListWidget):
                         elif button_type == 'text':
                             value = button_state.get("text")
                         else:
-                            value = "?"
+                            value = button_state.get("value")
                     else:
                         value = " "
 
@@ -414,8 +469,14 @@ class Rubric(QListWidget):
         self.scores.pop(exam_id, None)
         for b in self.filter_buttons(StateButton):  # type: Score
             state = b.get_state()
+
+            print(b.get_name(), b.get_state())
+
             # Only store if a button has been pressed or there is some text
-            if state.get("value", -1) != -1 or state.get("text", "") != "":
+            if (state.get("value", -1) != -1 or
+                    state.get("text", "") != "" or
+                    state.get("percent", -1) != -1):
+
                 if self.scores.get(exam_id) is None:
                     self.scores[exam_id] = {}
                 self.scores[exam_id][b.get_name()] = state

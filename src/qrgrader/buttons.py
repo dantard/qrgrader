@@ -157,11 +157,6 @@ class StepButton(PushButton):
                 "color": self.get_color(), "comment": self.comment, "start_with": self.start_with,
                 "click_next": self.click_next}
 
-    # kwargs = {"weight": 1, "full_value": 1,
-    #                "steps": 0, "color": None,
-    #                "comment": "", "start_with": 100,
-    #                "click_next": False, "type": "button"}
-
     def toggle_show_points(self):
         self.points_lb.setVisible(not self.points_lb.isVisible())
 
@@ -178,23 +173,6 @@ class StepButton(PushButton):
             value = -1
 
         return {"value": value, "comment": self.comment}
-
-    def get_xls_value(self):
-        state = self.get_state()
-        value = state.get("value")
-        if value == -1:
-            return " "
-        else:
-            return value / 100
-
-    def get_value(self):
-        if self.is_checked():
-            if self.n_steps == 0:
-                return self.get_full_value()
-            else:
-                return float(self.spinner.value() / 100.0) * self.get_full_value()
-        else:
-            return None
 
     def clicked(self):
         self.spinner.blockSignals(True)
@@ -271,19 +249,16 @@ class PercentButton(PushButton):
         return {"percent": self.percent, "color": self.get_color()}
 
     def get_state(self):
-        return {"percent": self.percent if self.button.isChecked() else 1}
+        return {"value": 1 if self.button.isChecked() else 0}
 
     def set_state(self, state):
-        self.button.setChecked(state.get("percent", 1) < 1)
-
-    def get_xls_value(self):
-        return self.percent if self.is_checked() else 1
+        self.button.setChecked(state.get("value", 0) == 1)
 
     def get_color(self):
         return self.button.styleSheet().split(":")[1].strip()
 
     def get_percent(self):
-        return self.percent if self.button.isChecked() else 1
+        return self.percent
 
     def get_click_next(self):
         return False
