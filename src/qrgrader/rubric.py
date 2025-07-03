@@ -327,6 +327,7 @@ class Rubric(QListWidget):
                     value = gspread.utils.rowcol_to_a1(current_row, col)
                     row2 += "*IF("+value+"=0,1,"+percent+")"
 
+
                 for col in cutter:
                     percent = gspread.utils.rowcol_to_a1(2, col)
                     value = gspread.utils.rowcol_to_a1(current_row, col)
@@ -526,3 +527,5 @@ class Rubric(QListWidget):
             if isinstance(widget, kind):
                 buttons.append(widget)
         return buttons
+
+
