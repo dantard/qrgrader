@@ -160,10 +160,17 @@ class RubricEditDialog(QDialog):
         self.le.setText(str(self.config.get("weight", 10)))
         self.layout.addRow("Weight", self.le)
 
+        self.precision = QLineEdit()
+        self.precision.setValidator(QtGui.QIntValidator(1, 4))
+        self.layout.addRow("Precision", self.precision)
+        self.precision.setText(str(self.config.get("precision", 2)))
+
+
         self.layout.addWidget(self.buttonBox)
 
     # if accepted, modify the config
     def accept(self):
         self.config["weight"] = float(self.le.text())
         self.config["page"] = int(self.combo.text())
+        self.config["precision"] = int(self.precision.text())
         super().accept()

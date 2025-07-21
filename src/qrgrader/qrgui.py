@@ -249,7 +249,6 @@ class MainWindow(QMainWindow):
             item.setText(2, "")
 
     def find_people(self):
-        print("si")
         text, ok = QInputDialog.getText(self, "Find People", "Enter NIA or Name:")
         if ok:
             nia = self.xls_data.get_nia_from_name(text)
@@ -326,18 +325,18 @@ class MainWindow(QMainWindow):
     def update_scores_layout(self):
 
         total = 0
-        quiz_score = self.get_quiz_score(self.current_exam)
-        self.quiz_score_lbl.setText(str(quiz_score))
+        quiz_score, full_score = self.get_quiz_score(self.current_exam)
+        self.quiz_score_lbl.setText("<b>" + str(quiz_score) + "</b>/" + str(full_score) + " (" + str(round(10*quiz_score / full_score, 2)) + "/10)")
         if self.quiz_cb.isChecked():
             total += quiz_score
 
         for index, r in enumerate(self.rubrics):
-            value = r.compute_score(self.current_exam)
-            self.rubrics_labels[index].setText(str(value))
+            value, full_value = r.compute_score(self.current_exam)
+            self.rubrics_labels[index].setText("<b>" + str(value) + "</b>/" + str(full_value) + " (" + str(round(10*value / full_value, 2)) + "/10)")
             if self.rubrics_cb[index].isChecked():
                 total += value
 
-        self.total_score_lbl.setText(str(total))
+        self.total_score_lbl.setText("<b>" + str(round(total,2)) + "</b>")
         return total
 
     def pdf_tree_selection_changed(self, current, previous):
@@ -429,9 +428,11 @@ class MainWindow(QMainWindow):
         total = 0
         for index, r in enumerate(self.rubrics):
             if self.rubrics_cb[index].isChecked():
-                total += r.compute_score(exam_id)
+                rubric_value, _ = r.compute_score(exam_id)
+                total += rubric_value
         if self.quiz_cb.isChecked():
-            total += self.get_quiz_score(exam_id)
+            quiz_score,quiz_full_value = self.get_quiz_score(exam_id)
+            total += quiz_score
 
         return total
 
@@ -451,11 +452,16 @@ class MainWindow(QMainWindow):
 
     def get_quiz_score(self, exam_id):
         score = 0
+        full_value = 0
         exam_codes = self.type_a.select(exam=exam_id % 1000)
         for code in exam_codes:
+            value = self.xls_questions.get_value(code.question, code.answer)
+            full_value += value if value > 0 else 0
             if code.marked:
-                score += self.xls_questions.get_value(code.question, code.answer)
-        return score
+                score += value
+        score = max(score, 0)  # Ensure score is not negative
+        score = round(score, 4) # Round to 4 decimal places
+        return score, full_value
 
     def get_multiple_marks(self, exam_id):
         yellow = []

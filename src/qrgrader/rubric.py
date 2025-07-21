@@ -248,8 +248,9 @@ class Rubric(QListWidget):
             multiplier = button.get_percent()
 
         points = points * multiplier
-
-        return points
+        points = points / total * self.config.get("weight", 10)
+        points = round(points, self.config.get("precision", 2))
+        return points, self.config.get("weight", 10)
 
     def save_scores(self):
         with open(self.scores_filename, "w", encoding='utf-8') as file:
@@ -299,8 +300,6 @@ class Rubric(QListWidget):
                 elif button_config.get("type") == 'cutter':
                     cutter.append(col)
                 col += 1
-
-            print(multipliers)
 
             # Sort scores by exam_id
             self.scores = dict(sorted(self.scores.items()))
@@ -470,8 +469,6 @@ class Rubric(QListWidget):
         self.scores.pop(exam_id, None)
         for b in self.filter_buttons(StateButton):  # type: Score
             state = b.get_state()
-
-            print(b.get_name(), b.get_state())
 
             # Only store if a button has been pressed or there is some text
             if (state.get("value", -1) != -1 or
