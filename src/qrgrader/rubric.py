@@ -228,15 +228,18 @@ class Rubric(QListWidget):
 
         total = 0
         points = 0
+        text = "="
         for button in self.filter_buttons(StepButton):
             this_button_data = this_exam_data.get(button.get_name(), {})
             value = this_button_data.get("value", 0)
             if value >= 0:
                 value = value * button.get_full_value() / 100.0
+                text = text + 'N("' + button.get_name() + '")+' + str(value) + ' + '
                 points = points + value
 
             total = total + button.get_full_value() * button.get_weight()
-
+        text += "0"
+        #print(text)
         cut = 1
         for button in self.filter_buttons(CutterButton):
             cut = min(cut, button.get_percent())
