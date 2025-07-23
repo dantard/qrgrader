@@ -131,3 +131,6 @@ class PageCodeSet(CodeSet):
         if len(self.codes.values()) > 0:
             return next(iter(self.codes.values())).date
         return None
+
+    def first(self, **kwargs) -> Code:
+        return next(iter(self.select(**kwargs)), None)

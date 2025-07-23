@@ -75,6 +75,38 @@ def get_codes(patch):
     return codes
 
 
+def get_similarity_transform(p1, p2):
+    # p1 and p2: two points each, given as (x, y) tuples
+    p1 = np.array(p1, dtype=np.float64)
+    p2 = np.array(p2, dtype=np.float64)
+
+    center1 = (p1[0] + p1[1]) / 2
+    center2 = (p2[0] + p2[1]) / 2
+
+    v1 = p1[1] - p1[0]
+    v2 = p2[1] - p2[0]
+
+    norm1 = np.linalg.norm(v1)
+    norm2 = np.linalg.norm(v2)
+    scale = norm2 / norm1
+
+    angle1 = np.arctan2(v1[1], v1[0])
+    angle2 = np.arctan2(v2[1], v2[0])
+    theta = angle2 - angle1
+
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    rotation = np.array([[cos_theta, -sin_theta],
+                         [sin_theta,  cos_theta]])
+
+    def transform_point(pt):
+        pt = np.array(pt, dtype=np.float64)
+        vec = pt - center1
+        transformed = scale * (rotation @ vec)
+        return tuple(transformed + center2)
+
+    return transform_point
+
 def compute_similarity_transform(p11, p12, p21, p22):
     # Convert points to numpy arrays
     p11, p12, p21, p22 = map(np.array, [p11, p12, p21, p22])

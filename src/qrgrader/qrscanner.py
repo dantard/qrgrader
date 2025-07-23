@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import time
+from itertools import accumulate
 from multiprocessing import Manager, Pool, Process
 from random import randint
 
@@ -177,9 +178,10 @@ def main():
         print("\nSimulation done.")
 
     if args.get("scan", False):
-        first_page = args.get("begin")
-
         os.makedirs(dir_temp_scanner, exist_ok=True)
+
+        first_page = args.get("begin")
+        last_page = args.get("end")
 
         generated = Generated(ppm)
         if not generated.load(dir_data + prefix + "generated.csv"):
@@ -187,13 +189,13 @@ def main():
             sys.exit(1)
 
         files = []
-        for i, filename in enumerate([x for x in os.listdir(dir_scanned) if x.endswith(".pdf")]):
+        for i, filename in enumerate(sorted([x for x in os.listdir(dir_scanned) if x.endswith(".pdf")])):
             document = pymupdf.open(dir_scanned + filename)
-            files.append((i, filename, len(document)))
+            files.append((i, filename, first_page, len(document) if last_page is None else last_page))
             document.close()
-        total_length = sum(length-first_page for _, _, length in files)
 
-        if total_length <=0:
+        total_length = sum(length-first for _, _, first, length in files)
+        if total_length <= 0:
             print("No pages to process. Exiting.")
             sys.exit(0)
 
@@ -204,20 +206,20 @@ def main():
             detected = manager.list()
             semaphore = manager.BoundedSemaphore(args.get("threads"))
 
-            for index, filename, length in files:
+            for index, filename, first, length in files:
+
                 index > 0 and print() # for the \r at the end of the last line
                 print(f">> Processing file {filename} ({index+1}/{len(files)})")
-                last_page = args.get("end") if args.get("end") is not None else length
 
-                for i in range(first_page, last_page):
+                for i in range(first, length):
 
                     semaphore.acquire()
+                    done += 1
 
                     procs = [p for p in processes if not p.is_alive()].copy()
                     for process in procs:
                         process.join()
                         processes.remove(process)
-                        done += 1
 
                     # We send the filename and open the document in the process for three reasons:
                     # 1. Sending the page object is not possible because it is not pickable

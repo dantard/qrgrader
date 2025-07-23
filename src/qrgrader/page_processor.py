@@ -5,11 +5,13 @@ import time
 from multiprocessing import Manager, Pool, Process
 
 import cv2
+import numpy as np
 import pymupdf
 
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet, PageCodeSet
-from qrgrader.utils import pix2np, get_patches, threshold, get_codes, compute_similarity_transform
+from qrgrader.utils import pix2np, get_patches, threshold, get_codes, compute_similarity_transform, \
+    get_similarity_transform
 
 
 class PageProcessor(Process):
@@ -42,54 +44,49 @@ class PageProcessor(Process):
         # Find page, orientation and rotate page
         rotation = None
         detected = PageCodeSet()
+        h, w = image.shape[:2]
 
         for th in self.thresholds:
-            ph, pw = image.shape[0], image.shape[1]
 
-            nw = image[0:500, 0:500]
-            ne = image[0:500, pw - 500:pw]
-            sw = image[ph - 500:ph, 0:500]
-            se = image[ph - 500:ph, pw - 500:pw]
-
-            nw = threshold(nw, th)
-            ne = threshold(ne, th)
-            sw = threshold(sw, th)
-            se = threshold(se, th)
-
-            # cv2.imwrite("nw.png", nw)
-            # cv2.imwrite("sw.png", sw)
-            # cv2.imwrite("ne.png", ne)
-            # cv2.imwrite("se.png", se)
-
+            ne = threshold(image[0:500, w - 500:w], th)
             for text, cx, cy, cw, ch in get_codes(ne):
                 if text.startswith("P"):
-                    rotation = None
+                    rotation = -1
                 elif text.startswith("Q"):
-                    rotation = cv2.ROTATE_90_CLOCKWISE
-                detected.append(Code(text, cx, cy, cw, ch))
-
-            for text, cx, cy, cw, ch in get_codes(nw):
-                if text.startswith("P"):
-                    rotation = cv2.ROTATE_90_CLOCKWISE
-                elif text.startswith("Q"):
-                    rotation = cv2.ROTATE_90_COUNTERCLOCKWISE
-                detected.append(Code(text, cx, cy, cw, ch))
-
-            for text, cx, cy, cw, ch in get_codes(sw):
-                if text.startswith("P"):
-                    rotation = cv2.ROTATE_90_COUNTERCLOCKWISE
-                elif text.startswith("Q"):
-                    rotation = None
-                detected.append(Code(text, cx, cy, cw, ch))
-
-            for text, cx, cy, cw, ch in get_codes(se):
-                if text.startswith("P"):
                     rotation = cv2.ROTATE_180
-                elif text.startswith("Q"):
-                    rotation = cv2.ROTATE_90_COUNTERCLOCKWISE
                 detected.append(Code(text, cx, cy, cw, ch))
 
-        if rotation is not None:
+            if rotation is None:
+                nw = threshold(image[0:500, 0:500], th)
+                for text, cx, cy, cw, ch in get_codes(nw):
+                    if text.startswith("P"):
+                        rotation = cv2.ROTATE_90_CLOCKWISE
+                    elif text.startswith("Q"):
+                        rotation = cv2.ROTATE_90_COUNTERCLOCKWISE
+                    detected.append(Code(text, cx, cy, cw, ch))
+
+            if rotation is None:
+                sw = threshold(image[h - 500:h, 0:500], th)
+                for text, cx, cy, cw, ch in get_codes(sw):
+                    if text.startswith("P"):
+                        rotation = cv2.ROTATE_180
+                    elif text.startswith("Q"):
+                        rotation = -1
+                    detected.append(Code(text, cx, cy, cw, ch))
+
+            if rotation is None:
+                se = threshold(image[h - 500:h, w - 500:w], th)
+                for text, cx, cy, cw, ch in get_codes(se):
+                    if text.startswith("P"):
+                        rotation = cv2.ROTATE_90_COUNTERCLOCKWISE
+                    elif text.startswith("Q"):
+                        rotation = cv2.ROTATE_90_CLOCKWISE
+                    detected.append(Code(text, cx, cy, cw, ch))
+
+            if rotation is not None:
+                break
+
+        if rotation is not None and rotation != -1:
             image = cv2.rotate(image, rotation)
 
         # Get the page number if we got it
@@ -144,24 +141,27 @@ class PageProcessor(Process):
 
         # Compute the transformation
         if detected.get_p() is not None and detected.get_q() is not None:
-            p11 = detected.get_p().get_pos()
-            p12 = detected.get_q().get_pos()
-            p21 = generated_page_codeset.get_p().get_pos()
-            p22 = generated_page_codeset.get_q().get_pos()
-            _, _, delta = compute_similarity_transform(p21, p22, p11, p12)
+            p11 = generated_page_codeset.get_p().get_pos()
+            p12 = generated_page_codeset.get_q().get_pos()
+            p21 = detected.get_p().get_pos()
+            p22 = detected.get_q().get_pos()
+            #scale, rot, delta = compute_similarity_transform(p21, p22, p11, p12)
+            transform = get_similarity_transform([p11, p12], [p21, p22]) # noqa
         elif detected.get_p() is not None:
             x1, y1 = detected.get_p().get_pos()
             x2, y2 = generated_page_codeset.get_p().get_pos()
-            delta = (x2 - x1, y2 - y1)
+            transform = lambda pt: (pt[0] + x2 - x1, pt[1] + y2 - y1) # noqa
         elif detected.get_q() is not None:
             x1, y1 = detected.get_q().get_pos()
             x2, y2 = generated_page_codeset.get_q().get_pos()
-            delta = (x2 - x1, y2 - y1)
+            transform = lambda pt: (pt[0] + x2 - x1, pt[1] + y2 - y1) # noqa
         else:
-            delta = (0, 0)
+            transform = lambda pt: (pt[0], pt[1]) # noqa # No transformation needed
 
         for code in generated_page_codeset:
-            code.move(delta)
+
+            new_pose = transform(code.get_pos())
+            code.set_pos(new_pose)  # Note: OpenCV uses (y, x) order
             code.set_size(120, 120)
             code.scale(72.0 / self.dpi)
             code.set_marked(detected.get(code) is None)

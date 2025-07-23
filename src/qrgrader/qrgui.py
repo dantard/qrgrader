@@ -326,7 +326,11 @@ class MainWindow(QMainWindow):
 
         total = 0
         quiz_score, full_score = self.get_quiz_score(self.current_exam)
-        self.quiz_score_lbl.setText("<b>" + str(quiz_score) + "</b>/" + str(full_score) + " (" + str(round(10*quiz_score / full_score, 2)) + "/10)")
+        if full_score != 0:
+            self.quiz_score_lbl.setText("<b>" + str(quiz_score) + "</b>/" + str(full_score) + " (" + str(round(10*quiz_score / full_score, 2)) + "/10)")
+        else:
+            self.quiz_score_lbl.setText("<b>0</b>")
+
         if self.quiz_cb.isChecked():
             total += quiz_score
 

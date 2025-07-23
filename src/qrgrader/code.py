@@ -64,9 +64,9 @@ class Code:
         self.x = pos[0]
         self.y = pos[1]
 
-    def move(self, delta):
-        self.x += delta[0]
-        self.y += delta[1]
+    def move(self, delta, scale):
+        self.x = self.x*scale - delta[1]
+        self.y = self.y*scale - delta[0]
 
     def get_exam_id(self):
         return self.exam
