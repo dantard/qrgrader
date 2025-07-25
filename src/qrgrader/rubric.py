@@ -9,6 +9,7 @@ from PyQt5.QtGui import QDrag, QPixmap, QPainter
 from PyQt5.QtWidgets import (QListWidget,
                              QAbstractItemView, QListWidgetItem, QMenu, QMessageBox,
                              QInputDialog, QColorDialog)
+from qrgrader.common import get_date
 
 from qrgrader.dialogs import ButtonEditDialog, RubricEditDialog
 from qrgrader.buttons import StepButton, Shortcut, Button, TextButton, StateButton, Separator, CutterButton, MultiplierButton
@@ -28,7 +29,8 @@ class Rubric(QListWidget):
         self.schema_filename = schema_filename
         name = self.schema_filename.split(".")[0]
         self.scores_filename = name + ".yaml"
-        self.xls_filename = dir_xls + name + ".csv"
+
+        self.xls_filename = dir_xls + get_date() + "_" + name + ".csv"
         self.current_exam_id = None
         self.modified = False
         self.buttons_height = kwargs.get("buttons_height")

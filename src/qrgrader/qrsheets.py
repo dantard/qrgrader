@@ -5,7 +5,9 @@ import sys
 
 import yaml
 
-from qrgrader.common import check_workspace
+from qrgrader.common import check_workspace, Nia, get_workspace_paths, get_date
+from qrgrader.encrypt import decrypt
+from qrgrader.secret import get_secret
 from qrgrader.utils import makedir
 
 # sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,21 +37,30 @@ def main():
     parser.add_argument('-w', '--workbook', help='Workbook name')
     parser.add_argument('-x', '--diff', help='Difference')
     parser.add_argument('-y', '--yeah', help="Answer 'yes' to all questions", action="store_true")
-
     args = vars(parser.parse_args())
-
-    workspace_dir = os.path.basename(os.getcwd())
 
     if not check_workspace():
         print("ERROR: qrsheets must be run from a workspace directory")
         sys.exit(1)
 
-    date = workspace_dir.split("-")[1]
+    dir_workspace, dir_data, _, dir_generated, dir_xls, _, dir_source = get_workspace_paths(os.getcwd())
+    date = get_date()
+
+    if not check_workspace():
+        print("ERROR: qrsheets must be run from a workspace directory")
+        sys.exit(1)
 
     # Create json file with client secrets
     makedir("config")
     if not os.path.exists("config" + os.sep + "client_secret.json"):
         with open("config" + os.sep + "client_secret.json", "w", encoding='utf-8') as f:
+            secret = get_secret()
+            passwd = input("Enter password for QRGrader secret: ")
+            try:
+                client_secrets_json = decrypt(secret, passwd)
+            except Exception as e:
+                print("Password incorrect. You may request a password to dantard@unizar.es", e)
+                sys.exit(1)
             f.write(client_secrets_json)
 
     # Load config file if provided
@@ -89,11 +100,26 @@ def main():
             args["list"] = folder_id
 
         if args.get("list", None):
+
+            nias = Nia(dir_xls + os.sep + str(date) + "_nia.csv")
+            nias.load()
+
             files = gd.ls(folder_id)
 
+            files.sort(key=lambda x: x[0].lower())
+
             with open("results" + os.sep + "xls" + os.sep + date + "_pdf.csv", "w", encoding='utf-8') as f:
-                for file in files:
-                    f.write(file[0].replace(".pdf", "") + "\t" + file[1] + "\n")
+                f.write("EXAM ID" + "\t" + "NIA" + "\t" + "LINK" + "\t" + "QUIZ" + "\t" + "OPEN" + "\t" + "TOTAL" + "\n")
+                for i, file in enumerate(files):
+                    name = file[0].replace(".pdf", "")
+                    link = "https://drive.google.com/u/3/uc?id=" + file[1]
+                    nia = nias.get_nia(name)
+                    fb_quiz = "=round(VLOOKUP(A" + str(i+2) + ",'"+date+"_raw'!A:Z,4,false),2)"
+                    fb_open = "=round(VLOOKUP(A" + str(i + 2) + ",'"+date+"_raw'!A:Z,5,false),2)"
+                    fb_total = "=round(VLOOKUP(A" + str(i + 2) + ",'"+date+"_raw'!A:Z,6,false),1)"
+
+                    f.write(name + "\t" + str(nia) + "\t" + link + "\t" +
+                            fb_quiz + "\t" + fb_open + "\t" + fb_total + "\n")
 
             print("Written to results/xls/{}_pdf.csv ({} rows)".format(date, len(files)))
 

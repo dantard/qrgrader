@@ -344,7 +344,7 @@ def main():
             raw.loc[exam_id, "NIA"] = nia.get_nia(exam_id)
         inserted += 1
 
-        # Insert the GRADE column
+        # Insert the GRADE columns
         raw.insert(inserted + 2, "T", '=SUMPRODUCT(INDIRECT(ADDRESS(ROW(), COLUMN() + 1) & ":" '
                                       '& ADDRESS(ROW(), COLUMNS($A$1:$1))) * INDIRECT(ADDRESS(4, COLUMN() + 1) & ":" '
                                       '& ADDRESS(4, COLUMNS($A$1:$1))))')
@@ -367,6 +367,7 @@ def main():
             ""] * (inserted + 2)
         ans_perc = ["Exam ID", "#", "NIA", "Q", "O", "T"]
 
+        num_open = 0
         for question in questions.get_questions():
             if questions.get_type(question) == "Q":
                 names.extend([questions.get_text(question), "", "", percent_ques])
@@ -379,7 +380,8 @@ def main():
                 qn.append(question)
                 ans_letter.append("O")
                 ans_value.append(questions.get_value(question, 1))
-                ans_perc.append(percent_ques)
+                ans_perc.append('=countif((INDIRECT(ADDRESS(6, COLUMN()) & ":" & ADDRESS(ROWS(6:1000), COLUMN()))),">0")/count((INDIRECT(ADDRESS(6, COLUMN()) & ":" & ADDRESS(ROWS(6:1000), COLUMN()))))')
+                num_open += 1
 
         # print(raw.shape, len(names), len(qn), len(ans_letter), len(ans_value), len(ans_perc))
 
@@ -388,8 +390,9 @@ def main():
         raw.loc[-3] = ans_letter
         raw.loc[-2] = ans_value
         raw.loc[-1] = ans_perc
-
         df = raw.sort_index().reset_index(drop=True)
+
+        df.iloc[5:,-num_open:] = '=VLOOKUP(INDIRECT("A" & ROW()), INDIRECT("'+get_date()+'_" & INDIRECT(ADDRESS(1, COLUMN(), 4)) & "!A:D"), 2, FALSE)'
 
         df.to_csv(table_filename, sep='\t', index=False, header=False)
 

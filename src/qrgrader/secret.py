@@ -1,0 +1,18 @@
+def get_secret():
+    return ("AYKymBgW0y_WGXSBDWZdBGdBQUFBQUJvZzJ3MHNWUzRTenZDNHk0cW"
+            "VndGx1WE5IbmpBSHkyTlM0VkhhU0FGSHhKdzJhTU51MV9FNzhSN2l5"
+            "cEwxTVE4cXF4WUh4ZUlJX3FTa25tS210aW91Z2dmdHV3SUZSdDktbW"
+            "xZbDMwUnBLcTI4TGhkRTRnVXpXUFlVaUswQVpqTjE0WTJPSko1REtW"
+            "Q0x0OG5Lc2dlaFBsRm9hY0RMSC1RelRpN004a3lvTmRLeGg4MklCOU"
+            "N1b29HcDd3M2k0eUNPTDhIdHFERE5mb1FqSEpGdERJblNWbmR5cXE5"
+            "MV83bjVzdU5tUVB1ZnJtS3lNR2NhdkJXZU9VOWFxWm5OLWNodExnbi"
+            "1EU001UEhtbEk4VGItRWpQTVpKUWFtbzVHS2UyMnZVTVd5X1FqSjAz"
+            "SkdpWDVWa2tkcEpaWDdobGpveTZNOURZMkNpWFFKN05vNGtQN1dXaU"
+            "NfRWZPVk1PaUo0N19NSlE3Ymxncm9pbS1ZMWZWRGRBWFFTNGxndnBv"
+            "c01aVmNRN05IOFJXdnVxNEdiUkdMMEJOZTFQcl9jODhmTG5Ba0tsTl"
+            "I3VW1wRHV5N1drdWhvM09jTWxoMHhFWkRHMWZ3RVBDUkRPVUpZM0hm"
+            "NmJUVkduamRDTU1ZUThRTThEeVVOck1HUUp4c056cDI2Ump1VXE1Qn"
+            "g0S1BUdjRsTFZqeDhYVzRPMXFmeUkwTWJoVWRVd1BqdlhiWG93YVNp"
+            "blgxbDdCRE43R0dNa1RtQVhZVWoxNWNiQk1FQUl2NnphclZCbWxvZl"
+            "9JaWdkSGlIMGRMRnFYeDlsbE1vdDhsU0lYOUhkcEZCM3A2Z19ENnBX"
+            "ajV5N1owdjZyQWVIUHUySE5HNjQ=")
