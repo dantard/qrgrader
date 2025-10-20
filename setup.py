@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='qrgrader',
-    version='0.0.17',
+    version='0.0.18',
     packages=find_packages(where='src'),  # Specify src directory
     package_dir={'': 'src'},  # Tell setuptools that packages are under src
     install_requires=[

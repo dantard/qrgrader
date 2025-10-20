@@ -392,7 +392,7 @@ def main():
         raw.loc[-1] = ans_perc
         df = raw.sort_index().reset_index(drop=True)
 
-        df.iloc[5:,-num_open:] = '=VLOOKUP(INDIRECT("A" & ROW()), INDIRECT("'+get_date()+'_" & INDIRECT(ADDRESS(1, COLUMN(), 4)) & "!A:D"), 2, FALSE)'
+        df.iloc[5:,-num_open:] = '=IFERROR(VLOOKUP(INDIRECT("A" & ROW()), INDIRECT("'+get_date()+'_" & INDIRECT(ADDRESS(1, COLUMN(), 4)) & "!A:D"), 2, FALSE),0)'
 
         df.to_csv(table_filename, sep='\t', index=False, header=False)
 
