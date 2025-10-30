@@ -72,10 +72,10 @@ class TextButton(StateButton):
         return {"type": "text"}
 
     def get_state(self):
-        return {"text": self.button.toPlainText()}
+        return {"text": self.button.toPlainText().replace("\n",";")}
 
     def set_state(self, state):
-        self.button.setText(state.get("text", ""))
+        self.button.setText(state.get("text", "").replace(";","\n"))
 
 class PushButton(StateButton):
 

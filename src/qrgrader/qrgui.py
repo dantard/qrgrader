@@ -15,7 +15,7 @@ from qrgrader.utils import makedir
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet
 from qrgrader.common import check_workspace, get_workspace_paths, Questions, Nia, StudentsData, get_prefix
-from qrgrader.pdf_tree import PDFTree
+from qrgrader.pdf_tree import PDFTree, NumericTreeWidgetItem
 from qrgrader.rubric import Rubric
 
 
@@ -293,6 +293,7 @@ class MainWindow(QMainWindow):
             name = os.path.basename(filename).replace(".scm", "")
             r1 = Rubric(filename, self.dir_xls, buttons_height=self.cfg_buttons_height.get(), buttons_font=self.cfg_buttons_font.get())
             r1.score_changed.connect(self.rubric_score_changed)
+            r1.button_or_value_changed.connect(self.rubric_button_or_value_changed)
             r1.goto_next.connect(self.goto_next)
             self.rubrics_tabs.addTab(r1, name)
             self.rubrics.append(r1)
@@ -321,6 +322,19 @@ class MainWindow(QMainWindow):
     def rubric_score_changed(self, rubric, exam_id):
         self.update_scores_layout()
         self.update_pdf_tree_score()
+
+    def rubric_button_or_value_changed(self):
+        # dialog with progress bar no advancement
+        progress = QProgressDialog("Processing...","",0, 0)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setCancelButton(None)
+        progress.setWindowTitle("QRGrader")
+        progress.show()
+        def delayed():
+            self.update_all_pdf_tree_scores()
+            self.update_scores_layout()
+            progress.hide()
+        QTimer.singleShot(100, delayed)
 
     def update_scores_layout(self):
 
@@ -386,7 +400,7 @@ class MainWindow(QMainWindow):
         files = sorted([f.replace(".pdf", "") for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()])
 
         for f in files:
-            item = QTreeWidgetItem(["", f, ""])
+            item = NumericTreeWidgetItem(["", f, ""])
             self.pdf_tree.addTopLevelItem(item)
 
         # Not updating the scores here, as it is done somewhere else

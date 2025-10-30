@@ -18,6 +18,7 @@ from qrgrader.buttons import StepButton, Shortcut, Button, TextButton, StateButt
 class Rubric(QListWidget):
     score_changed = pyqtSignal(object, int)
     goto_next = pyqtSignal()
+    button_or_value_changed = pyqtSignal()
 
     def __init__(self, schema_filename, dir_xls, **kwargs):
         super().__init__()
@@ -152,6 +153,7 @@ class Rubric(QListWidget):
         self.setItemWidget(item, button)
         item.setSizeHint(button.sizeHint())
         self.save_schema()
+        self.button_or_value_changed.emit()
 
     def get_dialog(self, button=None):
 
@@ -201,6 +203,7 @@ class Rubric(QListWidget):
                     self.scores[exam_id][button.get_name()] = self.scores[exam_id].pop(prev_name)
 
         self.save_schema()
+        self.button_or_value_changed.emit()
 
     def button_list_right_click(self, pos):
         menu = QMenu()
@@ -392,7 +395,7 @@ class Rubric(QListWidget):
             item = self.takeItem(position)
             del item
             self.save_schema()
-            self.score_changed.emit(self, self.exam_id)
+            self.button_or_value_changed.emit()
 
     def add_comment(self, position):
         # help me get text comment with dialog
@@ -436,6 +439,7 @@ class Rubric(QListWidget):
         dialog = RubricEditDialog(self.config)
         if dialog.exec():
             self.save_schema()
+            self.button_or_value_changed.emit()
 
     def set_shortcut_color(self, position):
         item = self.item(position)

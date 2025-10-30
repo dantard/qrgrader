@@ -1,5 +1,5 @@
 from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtWidgets import QTreeWidget, QHeaderView
+from PyQt5.QtWidgets import QTreeWidget, QHeaderView,QTreeWidgetItem
 
 
 class MyTreeHeader(QHeaderView):
@@ -11,6 +11,14 @@ class MyTreeHeader(QHeaderView):
         column = self.logicalIndexAt(event.pos())
         if column != 0:
             super().mousePressEvent(event)
+
+class NumericTreeWidgetItem(QTreeWidgetItem):
+    def __lt__(self, other):
+        column = self.treeWidget().sortColumn()
+        try:
+            return float(self.text(column)) < float(other.text(column))
+        except ValueError:
+            return self.text(column) < other.text(column)
 
 
 class PDFTree(QTreeWidget):
@@ -28,7 +36,6 @@ class PDFTree(QTreeWidget):
         self.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.header().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.header().sortIndicatorChanged.connect(self.sort)
-
 
     def sort(self, index, order):
         if index > 0:
