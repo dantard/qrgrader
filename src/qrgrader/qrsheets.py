@@ -53,15 +53,15 @@ def main():
     # Create json file with client secrets
     makedir("config")
     if not os.path.exists("config" + os.sep + "client_secret.json"):
-        with open("config" + os.sep + "client_secret.json", "w", encoding='utf-8') as f:
             secret = get_secret()
             passwd = input("Enter password for QRGrader secret: ")
             try:
                 client_secrets_json = decrypt(secret, passwd)
+                with open("config" + os.sep + "client_secret.json", "w", encoding='utf-8') as f:
+                    f.write(client_secrets_json)
             except Exception as e:
                 print("Password incorrect. You may request a password to dantard@unizar.es", e)
                 sys.exit(1)
-            f.write(client_secrets_json)
 
     # Load config file if provided
     if args["file"] is not None:

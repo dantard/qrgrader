@@ -1,3 +1,5 @@
+from random import random, seed
+
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import QTreeWidget, QHeaderView,QTreeWidgetItem
 
@@ -25,7 +27,7 @@ class PDFTree(QTreeWidget):
 
     def __init__(self):
         super().__init__()
-
+        seed(0)
         self.enabled = True
         self.setHeaderLabels(["#", "Exam Id", "!", "Score"])
         self.setSortingEnabled(True)
@@ -51,8 +53,7 @@ class PDFTree(QTreeWidget):
 
     def addTopLevelItem(self, item):
         super().addTopLevelItem(item)
-        self.sortByColumn(1, Qt.AscendingOrder)
-        self.renumber()
+
 
     def keyPressEvent(self, event):
         if self.enabled:

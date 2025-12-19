@@ -256,7 +256,8 @@ class Rubric(QListWidget):
             multiplier = button.get_percent()
 
         points = points * multiplier
-        points = points / total * self.config.get("weight", 10)
+        if total > 0:
+            points = points / total * self.config.get("weight", 10)
         points = round(points, self.config.get("precision", 2))
         return points, self.config.get("weight", 10)
 

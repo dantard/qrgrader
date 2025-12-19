@@ -345,15 +345,13 @@ def main():
         inserted += 1
 
         # Insert the GRADE columns
-        raw.insert(inserted + 2, "T", '=SUMPRODUCT(INDIRECT(ADDRESS(ROW(), COLUMN() + 1) & ":" '
-                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1))) * INDIRECT(ADDRESS(4, COLUMN() + 1) & ":" '
-                                      '& ADDRESS(4, COLUMNS($A$1:$1))))')
+        raw.insert(inserted + 2, "T", '=INDIRECT(ADDRESS(ROW(), COLUMN() -2)) + INDIRECT(ADDRESS(ROW(), COLUMN() -1))')
         raw.insert(inserted + 2, "O", '=SUMPRODUCT(($G$3:$3="O") * INDIRECT(ADDRESS(ROW(), COLUMN() + 2) & ":" '
                                       '& ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 2) & ":" '
                                       '& ADDRESS(4, COLUMNS($A$1:$1))))')
-        raw.insert(inserted + 2, "Q", '=SUMPRODUCT(($G$3:$3<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" '
+        raw.insert(inserted + 2, "Q", '=max(0,SUMPRODUCT(($G$3:$3<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" '
                                       '& ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" '
-                                      '& ADDRESS(4, COLUMNS($A$1:$1))))')
+                                      '& ADDRESS(4, COLUMNS($A$1:$1)))))')
 
         inserted += 3
 

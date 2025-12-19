@@ -2,6 +2,24 @@ from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QCursor, QGuiApplication, QFont
 from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSpinBox, QLabel, QTextEdit, QVBoxLayout
 
+class ThirdButton(QPushButton):
+
+    def __init__(self, name):
+        super().__init__(name)
+        self.which = Qt.NoButton
+
+    def mousePressEvent(self, a0):
+        super().mousePressEvent(a0)
+        #a0.accept()
+        self.which = a0.button()
+        if self.which == Qt.MidButton:
+            self.click()
+            self.clicked.emit()
+
+    def mouseReleaseEvent(self, a0):
+        super().mouseReleaseEvent(a0)
+        self.which = Qt.NoButton
+
 
 class Button(QWidget):
     def __init__(self, name):
@@ -81,7 +99,7 @@ class PushButton(StateButton):
 
     def __init__(self,name, **kwargs):
         super().__init__(name)
-        self.button = QPushButton(name)
+        self.button = ThirdButton(name)
         self.button.setMinimumWidth(10)
         self.button.setCheckable(True)
 
@@ -177,6 +195,8 @@ class StepButton(PushButton):
     def clicked(self):
         self.spinner.blockSignals(True)
         if QGuiApplication.queryKeyboardModifiers() == Qt.ControlModifier:
+            self.spinner.setValue(0)
+        elif self.button.which == Qt.MidButton:
             self.spinner.setValue(0)
         else:
             self.spinner.setValue(self.start_with if self.button.isChecked() else 0)

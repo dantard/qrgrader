@@ -1,10 +1,12 @@
 import argparse
 import os
 import sys
+import random
+from random import shuffle
 
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
 from PyQt5.QtGui import QPen, QKeySequence
-from PyQt5.QtWidgets import QApplication, QInputDialog, QShortcut, QProgressDialog
+from PyQt5.QtWidgets import QApplication, QInputDialog, QShortcut, QProgressDialog, QMessageBox, QPushButton
 from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, QSplitter, QGraphicsRectItem, QTabWidget, QLabel, QVBoxLayout, \
     QSizePolicy, QFormLayout, QCheckBox, QGroupBox
 from easyconfig2.easyconfig import EasyConfig2
@@ -50,10 +52,11 @@ class EditableLabel(QLabel):
             self.new_value.emit(a)
 
 class MainWindow(QMainWindow):
-    def __init__(self, schema_filenames):
+    def __init__(self, schema_filenames, randomize):
         super().__init__()
-
         makedir(os.path.expanduser("~") + os.sep + ".config/qrgrader/")
+
+        self.randomize = randomize
         self.config = EasyConfig2(filename=os.path.expanduser("~") + os.sep + ".config/qrgrader/qrgrader.yaml")
         self.cfg_geometry = self.config.root().addPrivate("geometry", default=[0, 0, 1200, 1000, False])
         self.cfg_buttons_height = self.config.root().addPrivate("buttons_height")
@@ -170,7 +173,7 @@ class MainWindow(QMainWindow):
             self.load_schemas()
             progress.setValue(10)
 
-            self.populate_pdf_tree()
+            self.populate_pdf_tree(self.randomize)
             self.pdf_tree.currentItemChanged.connect(self.pdf_tree_selection_changed)
 
             if self.pdf_tree.topLevelItemCount() > 0:
@@ -198,10 +201,21 @@ class MainWindow(QMainWindow):
                     self.update_done_color(item)
                     self.update_number_assessed()
 
+            self.rubrics_tabs.currentChanged.connect(self.rubric_tab_changed)
+
             progress.hide()
 
             # add shortcut to find people
         QTimer.singleShot(100, delayed)
+
+    def rubric_tab_changed(self, index):
+        rubric = self.rubrics_tabs.currentWidget()
+        if rubric is not None:
+            index = rubric.get_page()
+            try:
+                self.swik.view.move_to_page(index)
+            except Exception as e:
+                pass
 
     def update_done_color(self, item):
         howmany = 0
@@ -210,10 +224,16 @@ class MainWindow(QMainWindow):
                 howmany += 1
         if howmany == 0:
             item.setForeground(1, Qt.red)
+            symb = ""
         elif howmany < len(self.rubrics):
             item.setForeground(1, Qt.magenta)
+            symb = "⏳"
         else:
             item.setForeground(1, Qt.black)
+            symb = "✓"
+
+        if item.text(2) not in ["!", "@"]:
+            item.setText(2, symb)
 
     def update_number_assessed(self):
         rubric = self.rubrics_tabs.currentWidget()
@@ -252,7 +272,8 @@ class MainWindow(QMainWindow):
         text, ok = QInputDialog.getText(self, "Find People", "Enter NIA or Name:")
         if ok:
             nia = self.xls_data.get_nia_from_name(text)
-            nia = nia or int(text)
+            if nia is None:
+                nia = int(text) if text.isdigit() else -1
             exam_id = self.xls_nia.get_exam(nia)
             for index in range(self.pdf_tree.topLevelItemCount()):
                 item = self.pdf_tree.topLevelItem(index)
@@ -260,6 +281,8 @@ class MainWindow(QMainWindow):
                     self.pdf_tree.setCurrentItem(item)
                     self.pdf_tree.scrollToItem(item)
                     break
+            else:
+                QMessageBox.information(self, "Not Found", "No exam found for NIA or Name: " + text)
 
     def closeEvent(self, a0):
         self.cfg_geometry.set(
@@ -341,7 +364,7 @@ class MainWindow(QMainWindow):
         total = 0
         quiz_score, full_score = self.get_quiz_score(self.current_exam)
         if full_score != 0:
-            self.quiz_score_lbl.setText("<b>" + str(quiz_score) + "</b>/" + str(full_score) + " (" + str(round(10*quiz_score / full_score, 2)) + "/10)")
+            self.quiz_score_lbl.setText("<b>" + str(quiz_score) + "</b>/" + str(round(full_score,1)) + " (" + str(round(10*quiz_score / full_score, 2)) + "/10)")
         else:
             self.quiz_score_lbl.setText("<b>0</b>")
 
@@ -395,13 +418,19 @@ class MainWindow(QMainWindow):
         self.pdf_tree.set_enabled(True)
 
 
-    def populate_pdf_tree(self):
+    def populate_pdf_tree(self, randomize=True):
         files = os.listdir(self.dir_publish)
-        files = sorted([f.replace(".pdf", "") for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()])
+        #shuffle files
 
+        files = sorted([f.replace(".pdf", "") for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()])
+        shuffle(files)
         for f in files:
             item = NumericTreeWidgetItem(["", f, ""])
             self.pdf_tree.addTopLevelItem(item)
+
+        if not randomize:
+            self.pdf_tree.sortByColumn(1, Qt.AscendingOrder)
+        self.pdf_tree.renumber()
 
         # Not updating the scores here, as it is done somewhere else
         # self.update_all_pdf_tree_scores()
@@ -525,6 +554,7 @@ def main():
     parser = argparse.ArgumentParser(description='qrgui.py')
     parser.add_argument('-s', '--schema', help='Schema to be used', default=[], action="append")
     parser.add_argument('-c', '--create', help="Create schema if doesn't exist", action="store_true")
+    parser.add_argument('-r', '--random', help="Randomize exam order", action="store_true")
     args = vars(parser.parse_args())
 
     filenames = []
@@ -545,7 +575,7 @@ def main():
                 sys.exit(1)
         filenames.append(filename)
 
-    main = MainWindow(filenames)
+    main = MainWindow(filenames, args["random"])
     sys.exit(app.exec_())
 
 
