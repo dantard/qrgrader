@@ -155,6 +155,17 @@ class PageProcessor(Process):
             x1, y1 = detected.get_q().get_pos()
             x2, y2 = generated_page_codeset.get_q().get_pos()
             transform = lambda pt: (pt[0] + x2 - x1, pt[1] + y2 - y1) # noqa
+
+        # According to ChatGPT
+        # elif detected.get_p() is not None:
+        #     x1, y1 = generated_page_codeset.get_p().get_pos()
+        #     x2, y2 = detected.get_p().get_pos()
+        #     transform = lambda pt: (pt[0] + x2 - x1, pt[1] + y2 - y1)  # noqa
+        # elif detected.get_q() is not None:
+        #     x1, y1 = generated_page_codeset.get_q().get_pos()
+        #     x2, y2 = detected.get_q().get_pos()
+        #     transform = lambda pt: (pt[0] + x2 - x1, pt[1] + y2 - y1)  # noqa
+
         else:
             transform = lambda pt: (pt[0], pt[1]) # noqa # No transformation needed
 
