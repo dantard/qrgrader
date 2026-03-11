@@ -101,8 +101,6 @@ class CodeSet:
                 code = Code(data, float(x), float(y), float(w), float(h), int(page), int(pdf_page))
                 if len(fields) > 7:
                     code.set_marked(int(fields[7]))
-                if len(fields) > 8:
-                    code.scanned = int(fields[8])
                 self.append(code)
         return True
 

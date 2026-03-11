@@ -158,8 +158,13 @@ class PageProcessor(Process):
         else:
             transform = lambda pt: (pt[0], pt[1]) # noqa # No transformation needed
 
-        for code in generated_page_codeset:
+        # TODO: NOTHING TO DO, JUST A NOTE
+        # TODO: ATTENTION! This is the KEY: ALL THE CODES will be present in the detected set,
+        # TODO: but they will be marked as "marked" if they were not detected in the page.
+        # TODO: This way we can keep track of all the codes and their positions, even if
+        # TODO: they were not detected in the page.
 
+        for code in generated_page_codeset:
             new_pose = transform(code.get_pos())
             code.set_pos(new_pose)  # Note: OpenCV uses (y, x) order
             code.set_size(120, 120)

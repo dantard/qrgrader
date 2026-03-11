@@ -563,8 +563,8 @@ class MainWindow(QMainWindow):
 
     def get_missing_pq_marks(self, exam_id):
         exam_id = exam_id % 1000
-        type_p = self.type_p.select(exam=exam_id, scanned=1)
-        type_q = self.type_q.select(exam=exam_id, scanned=1)
+        type_p = self.type_p.select(exam=exam_id, marked=1)
+        type_q = self.type_q.select(exam=exam_id, marked=1)
         return len(type_p) != len(type_q)
 
 
