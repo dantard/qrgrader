@@ -67,5 +67,11 @@ class PDFTree(QTreeWidget):
         else:
             event.ignore()
 
+    def mouseMoveEvent(self, event):
+        if self.enabled:
+            super().mouseMoveEvent(event)
+        else:
+            event.ignore()
+
     def set_enabled(self, value):
         self.enabled = value

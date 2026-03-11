@@ -421,7 +421,6 @@ class MainWindow(QMainWindow):
         return total
 
     def pdf_tree_selection_changed(self, current, previous):
-
         self.pdf_tree.set_enabled(False)
         if previous is not None:
             if len(self.rubrics) > 0:
@@ -442,7 +441,6 @@ class MainWindow(QMainWindow):
         self.swik.open(f"{self.dir_publish}{self.current_exam}.pdf", ratio=ratio, index=index)
 
     def load_finished(self):
-        self.pdf_tree.set_enabled(True)
 
         self.process_exam()
 
