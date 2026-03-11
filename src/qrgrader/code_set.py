@@ -7,6 +7,12 @@ class CodeSet:
     def __init__(self, codes=None):
         self.codes = {} if codes is None else codes
 
+    def __add__(self, other):
+        c = CodeSet()
+        c.extend(self)
+        c.extend(other)
+        return c
+
     def append(self, code):
         self.codes[code.data] = code
 

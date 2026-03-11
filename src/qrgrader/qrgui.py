@@ -6,14 +6,17 @@ from random import shuffle
 
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
 from PyQt5.QtGui import QPen, QKeySequence
-from PyQt5.QtWidgets import QApplication, QInputDialog, QShortcut, QProgressDialog, QMessageBox, QPushButton
+from PyQt5.QtWidgets import QApplication, QInputDialog, QShortcut, QProgressDialog, QMessageBox, QPushButton, QMenu
 from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, QSplitter, QGraphicsRectItem, QTabWidget, QLabel, QVBoxLayout, \
     QSizePolicy, QFormLayout, QCheckBox, QGroupBox
 from easyconfig2.easyconfig import EasyConfig2
 from numpy.ma.core import maximum
+from swikv4.pages.swik_page import SwikPage
+
 from qrgrader.dialogs import ControlDialog
 from swikv4.widgets.swik_basic_widget import SwikBasicWidget
 
+from qrgrader.filter_dialog import FilterDialog
 from qrgrader.utils import makedir
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet
@@ -157,10 +160,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("QR Grader")
         self.shortcut = QShortcut(QKeySequence('Ctrl+F'), self)
         self.shortcut.activated.connect(self.find_people)
-
-        self.shortcut = QShortcut(QKeySequence('Ctrl+P'), self)
-        self.shortcut.activated.connect(self.show_control_dialog)
-
         self.show()
 
 
@@ -214,16 +213,23 @@ class MainWindow(QMainWindow):
             # add shortcut to find people
         QTimer.singleShot(100, delayed)
 
-    def show_control_dialog(self):
-        # shortcut for ctrl + key up and ctrl + key down to navigate through the pdf tree
-        a = ControlDialog(lambda: self.detected.save(self.dir_data + self.prefix + "detected.csv"),
-                          lambda: self.move_codes(0,-2),
-                          lambda: self.move_codes(0,2),
-                          lambda: self.move_codes(-2, 0),
-                          lambda: self.move_codes(2, 0),
-                          lambda: self.move_codes(0,0,1.01),
-                          lambda: self.move_codes(0,0,0.99), self)
-        a.show()
+    def contextMenuEvent(self, event):
+        pos = self.swik.view.mapFrom(self, event.pos())
+        item = self.swik.view.get_item_at_position(pos,SwikPage)
+        if item is not None:
+            menu = QMenu(self)
+            move_action = menu.addAction("Move Codes")
+            action = menu.exec_(self.mapToGlobal(event.pos()))
+            if action == move_action:
+                dialog = ControlDialog(item.index, lambda: self.detected.save(self.dir_data + self.prefix + "detected.csv"),
+                                        lambda: self.move_codes(item.index,0, -2),
+                                        lambda: self.move_codes(item.index,0, 2),
+                                        lambda: self.move_codes(item.index,  -2, 0),
+                                        lambda: self.move_codes(item.index,2, 0),
+                                        lambda: self.move_codes(item.index,0, 0, 1.01),
+                                        lambda: self.move_codes(item.index,0, 0, 0.99), self)
+                dialog.show()
+
 
     def rubric_tab_changed(self, index):
         rubric = self.rubrics_tabs.currentWidget()
@@ -315,6 +321,9 @@ class MainWindow(QMainWindow):
         self.type_a = self.detected.select(type=Code.TYPE_A)
         self.type_n = self.detected.select(type=Code.TYPE_N)
 
+        #self.type_p = self.detected.select(type=Code.TYPE_P)
+        #self.type_q = self.detected.select(type=Code.TYPE_Q)
+
     def load_tables(self):
 
         if not self.xls_questions.load():
@@ -328,6 +337,15 @@ class MainWindow(QMainWindow):
         if not self.xls_data.load():
             print("WARNING: data.csv file not present")
 
+    def rubric_filtered(self):
+        for index in range(self.pdf_tree.topLevelItemCount()):
+            item = self.pdf_tree.topLevelItem(index)
+            exam_id = int(item.text(1))
+            comply = True
+            for rubric in self.rubrics:
+                comply = comply and rubric.comply_with_filter(exam_id)
+                item.setHidden(not comply)
+
     def load_schemas(self):
         for filename in self.rubrics_files:
             name = os.path.basename(filename).replace(".scm", "")
@@ -335,6 +353,8 @@ class MainWindow(QMainWindow):
             r1.score_changed.connect(self.rubric_score_changed)
             r1.button_or_value_changed.connect(self.rubric_button_or_value_changed)
             r1.goto_next.connect(self.goto_next)
+            r1.filtered.connect(self.rubric_filtered)
+
             self.rubrics_tabs.addTab(r1, name)
             self.rubrics.append(r1)
 
@@ -540,6 +560,19 @@ class MainWindow(QMainWindow):
                         yellow.append(answer)
         return yellow
 
+    def get_missing_pq_marks(self, exam_id):
+        yellow = []
+        exam_id = exam_id % 1000
+        type_a = self.type_a.select(exam=exam_id)
+        for question in type_a.get_questions():
+            answers = type_a.select(question=question)
+            marked = sum([1 for x in answers if x.marked])
+            if marked > 1:
+                for answer in answers:
+                    if answer.marked:
+                        yellow.append(answer)
+        return yellow
+
     def code_clicked(self, code):
         self.changed.append(code)
         self.changed.save(self.dir_data + self.prefix + "changed.csv")
@@ -559,22 +592,30 @@ class MainWindow(QMainWindow):
         else:
             item.setText(2, "")
 
-    def move_codes(self, x, y, scale=1):
-        page_codes_type_a = self.type_a.select(exam=self.current_exam%1000, pdf_page=self.swik.view.get_current_page().index + 1)
-        page_codes_type_n = self.type_n.select(exam=self.current_exam%1000, pdf_page=self.swik.view.get_current_page().index + 1)
-        # print("Moving codes", self.current_exam,"up" if up else "down", "page", self.swik.view.get_current_page().index + 1, "type_a:", len(page_codes_type_a), "type_n:", len(page_codes_type_n))
-        if len(page_codes_type_a) == 0 and len(page_codes_type_n) == 0:
+    def move_codes(self, page, x, y, scale=1):
+        page_codes_type_a = self.type_a.select(exam=self.current_exam%1000, pdf_page=page + 1)
+        page_codes_type_n = self.type_n.select(exam=self.current_exam%1000, pdf_page=page + 1)
+        a_plus_n = page_codes_type_n + page_codes_type_a
+
+        if len(a_plus_n) == 0:
             return
-        for code in page_codes_type_a: # type: Code
-            code.y += y
-            code.x += x
-            code.x = code.x * scale
-            code.y = code.y * scale
-        for code in page_codes_type_n: # type: Code
-            code.y += y
-            code.x += x
-            code.x = code.x * scale
-            code.y = code.y * scale
+
+        most_left, selected = 1e6, None
+
+        for code in [c for c in a_plus_n if c.marked]:
+            if code.x < most_left:
+                selected = code
+                most_left = code.x
+
+        if scale!=1 and selected is not None:
+            # the selected code maintain its position and the others are scaled around it
+            x = selected.x * (1 - scale)
+            y = selected.y * (1 - scale)
+
+        for code in a_plus_n:
+            code.x = code.x * scale + x
+            code.y = code.y * scale + y
+
         self.process_exam()
 
 

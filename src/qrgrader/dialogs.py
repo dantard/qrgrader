@@ -1,9 +1,10 @@
-from PyQt5 import QtWidgets, QtGui
+from PyQt5 import QtWidgets, QtGui, Qt, QtCore
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import (QLineEdit, QPushButton, QSpinBox, QDialog, QDialogButtonBox, QComboBox, QDoubleSpinBox, QFormLayout, QCheckBox, QApplication, QDialog, QPushButton,
-    QGridLayout, QVBoxLayout, QHBoxLayout,
-    QDialogButtonBox)
+from PyQt5.QtWidgets import (QLineEdit, QPushButton, QSpinBox, QDialog, QDialogButtonBox, QComboBox, QDoubleSpinBox,
+                             QFormLayout, QCheckBox, QApplication, QDialog, QPushButton,
+                             QGridLayout, QVBoxLayout, QHBoxLayout,
+                             QDialogButtonBox, QLabel)
 
 from qrgrader.widget_utils import WidgetsRow, VBox
 
@@ -179,11 +180,12 @@ class RubricEditDialog(QDialog):
 
 
 class ControlDialog(QDialog):
-    def __init__(self, accepting, up, down, left, right, scale_up, scale_down, parent=None):
+    def __init__(self, page, accepting, up, down, left, right, scale_up, scale_down, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Controls")
-        self.setFixedSize(120, 180)
+        self.setWindowTitle(f" ")
+        self.setFixedSize(150, 170)
         self.accepting = accepting
+
         # Direction buttons
         btn_up = QPushButton("↑")
         btn_up.clicked.connect(up)
@@ -203,32 +205,34 @@ class ControlDialog(QDialog):
         # Compact size
         for b in [btn_up, btn_down, btn_left, btn_right, btn_scale_up, btn_scale_down]:
             b.setFixedSize(28, 28)
+            b.setAutoRepeat(True)
+            b.setAutoRepeatInterval(25)
 
         grid = QGridLayout()
-        grid.setSpacing(2)
-        grid.setContentsMargins(2, 2, 2, 2)
+        #grid.setSpacing(2)
+        #grid.setContentsMargins(2, 2, 2, 2)
 
         grid.addWidget(btn_up, 0, 1)
         grid.addWidget(btn_left, 1, 0)
         grid.addWidget(btn_right, 1, 2)
         grid.addWidget(btn_down, 2, 1)
 
-        grid.addWidget(btn_scale_down, 3, 0)
-        grid.addWidget(btn_scale_up, 3, 2)
+        grid.addWidget(btn_scale_down, 0, 2)
+        grid.addWidget(btn_scale_up, 2, 2)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok)
-        buttons.accepted.connect(self.close)
-
+        close = QPushButton("Done")
+        close.clicked.connect(self.close)
         layout = QVBoxLayout()
-        layout.setSpacing(3)
+        label = QLabel(f"Page {page + 1}")
+        label.setAlignment(QtCore.Qt.AlignCenter)
+        layout.addWidget(label)
         layout.addLayout(grid)
-        buttons.setContentsMargins(2,10,2,2)
-        grid.addWidget(buttons, 4, 0, 1, 3)
+        # buttons.setContentsMargins(2,10,2,2)
+        layout.addWidget(close)
 
         self.setLayout(layout)
     # on ok clicked
-    def close(self):
-        super().close()
-        print("diocaning")
+    def closeEvent(self, a):
+        super().closeEvent(a)
         self.accepting()
 

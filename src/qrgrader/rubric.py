@@ -8,21 +8,24 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QDrag, QPixmap, QPainter
 from PyQt5.QtWidgets import (QListWidget,
                              QAbstractItemView, QListWidgetItem, QMenu, QMessageBox,
-                             QInputDialog, QColorDialog)
+                             QInputDialog, QColorDialog, QPushButton, QWidget, QVBoxLayout, QFrame)
 from qrgrader.common import get_date
 
 from qrgrader.dialogs import ButtonEditDialog, RubricEditDialog
 from qrgrader.buttons import StepButton, Shortcut, Button, TextButton, StateButton, Separator, CutterButton, MultiplierButton
+from qrgrader.filter_dialog import FilterDialog
 
 
 class Rubric(QListWidget):
     score_changed = pyqtSignal(object, int)
     goto_next = pyqtSignal()
     button_or_value_changed = pyqtSignal()
+    filtered = pyqtSignal()
 
     def __init__(self, schema_filename, dir_xls, **kwargs):
         super().__init__()
 
+        self.filters = None
         self.exam_id = None
         self.config = {}
         self.scores = {}
@@ -46,8 +49,66 @@ class Rubric(QListWidget):
 
         self.schemaChanged.connect(self.save_schema) # type: ignore
         self.customContextMenuRequested.connect(self.button_list_right_click)
+
+        self.filter_btn = QPushButton("Apply Filter")
+        self.filter_btn.setFlat(True)
+        self.filter_btn.setCheckable(True)
+        self.filter_btn.setStyleSheet("background-color: #F0A0A0")
+        self.filter_btn.clicked.connect(self.toggle_filter)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(5, 5, 5, 0)  # margins you want
+        layout.addWidget(self.filter_btn)
+        item = QListWidgetItem()
+        self.addItem(item)
+        item.setSizeHint(container.sizeHint())
+        self.setItemWidget(item, container)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        item = QListWidgetItem()
+        item.setFlags(Qt.NoItemFlags)  # optional: makes it non-selectable
+        item.setSizeHint(line.sizeHint())
+        self.addItem(item)
+        self.setItemWidget(item, line)
+
+
         self.populate()
         self.load_scores()
+
+    def toggle_filter(self):
+        if not self.filter_btn.isChecked():
+            self.filters = None
+            self.filtered.emit()
+        else:
+            filter_dialog = FilterDialog(self)
+            if filter_dialog.exec() == QInputDialog.Accepted:
+                self.set_filter(filter_dialog.get_selection())
+                self.filtered.emit()
+            else:
+                self.filter_btn.setChecked(False)
+                self.filters = None
+                self.filtered.emit()
+
+
+    def set_filter(self, filters):
+        self.filters = filters
+        self.filtered.emit()
+
+    def comply_with_filter(self, exam_id):
+        if self.filters is None:
+            return True
+
+        exam_scores = self.scores.get(exam_id, {})
+
+        ok = True
+        for k, v in self.filters.items():
+            button_score = exam_scores.get(k, {})
+            print("Filtering:", k, v, button_score)
+            ok = ok and button_score.get("value", -1) == v.get("value")
+        return ok
 
     def load_scores(self):
         if os.path.exists(self.scores_filename):
