@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, 
     QSizePolicy, QFormLayout, QCheckBox, QGroupBox
 from easyconfig2.easyconfig import EasyConfig2
 from numpy.ma.core import maximum
+from qrgrader.dialogs import ControlDialog
 from swikv4.widgets.swik_basic_widget import SwikBasicWidget
 
 from qrgrader.utils import makedir
@@ -156,7 +157,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("QR Grader")
         self.shortcut = QShortcut(QKeySequence('Ctrl+F'), self)
         self.shortcut.activated.connect(self.find_people)
+
+        self.shortcut = QShortcut(QKeySequence('Ctrl+P'), self)
+        self.shortcut.activated.connect(self.show_control_dialog)
+
         self.show()
+
 
         files = os.listdir(self.dir_publish)
         files = [f for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()]
@@ -207,6 +213,17 @@ class MainWindow(QMainWindow):
 
             # add shortcut to find people
         QTimer.singleShot(100, delayed)
+
+    def show_control_dialog(self):
+        # shortcut for ctrl + key up and ctrl + key down to navigate through the pdf tree
+        a = ControlDialog(lambda: self.detected.save(self.dir_data + self.prefix + "detected.csv"),
+                          lambda: self.move_codes(0,-2),
+                          lambda: self.move_codes(0,2),
+                          lambda: self.move_codes(-2, 0),
+                          lambda: self.move_codes(2, 0),
+                          lambda: self.move_codes(0,0,1.01),
+                          lambda: self.move_codes(0,0,0.99), self)
+        a.show()
 
     def rubric_tab_changed(self, index):
         rubric = self.rubrics_tabs.currentWidget()
@@ -465,7 +482,7 @@ class MainWindow(QMainWindow):
                 r.signal.double_click.connect(self.code_clicked)
                 r.setParentItem(self.swik.view.get_page(index))
                 if code.marked:
-                    r.setPen(QPen(Qt.blue, 2))
+                    r.setPen(QPen(Qt.magenta, 2))
 
         yellow = self.get_multiple_marks(exam_id)
         for answer in yellow:
@@ -541,6 +558,24 @@ class MainWindow(QMainWindow):
             item.setText(2, "@")
         else:
             item.setText(2, "")
+
+    def move_codes(self, x, y, scale=1):
+        page_codes_type_a = self.type_a.select(exam=self.current_exam%1000, pdf_page=self.swik.view.get_current_page().index + 1)
+        page_codes_type_n = self.type_n.select(exam=self.current_exam%1000, pdf_page=self.swik.view.get_current_page().index + 1)
+        # print("Moving codes", self.current_exam,"up" if up else "down", "page", self.swik.view.get_current_page().index + 1, "type_a:", len(page_codes_type_a), "type_n:", len(page_codes_type_n))
+        if len(page_codes_type_a) == 0 and len(page_codes_type_n) == 0:
+            return
+        for code in page_codes_type_a: # type: Code
+            code.y += y
+            code.x += x
+            code.x = code.x * scale
+            code.y = code.y * scale
+        for code in page_codes_type_n: # type: Code
+            code.y += y
+            code.x += x
+            code.x = code.x * scale
+            code.y = code.y * scale
+        self.process_exam()
 
 
 

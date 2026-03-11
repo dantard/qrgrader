@@ -1,7 +1,9 @@
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import (QLineEdit, QPushButton, QSpinBox, QDialog, QDialogButtonBox, QComboBox, QDoubleSpinBox, QFormLayout, QCheckBox)
+from PyQt5.QtWidgets import (QLineEdit, QPushButton, QSpinBox, QDialog, QDialogButtonBox, QComboBox, QDoubleSpinBox, QFormLayout, QCheckBox, QApplication, QDialog, QPushButton,
+    QGridLayout, QVBoxLayout, QHBoxLayout,
+    QDialogButtonBox)
 
 from qrgrader.widget_utils import WidgetsRow, VBox
 
@@ -59,7 +61,7 @@ class ButtonEditDialog(QDialog):
         self.layout.addWidget(WidgetsRow("Percent", self.percent))
         #
         self.weight = QDoubleSpinBox()
-        self.weight.setDecimals(1)
+        self.weight.setDecimals(2)
         self.weight.setMinimum(-20)
         self.weight.setMaximum(20)
         self.weight.setValue(float(schema.get('weight', 1)))
@@ -154,7 +156,7 @@ class RubricEditDialog(QDialog):
         self.le = QLineEdit()
 
         # limit to 1 decimal
-        self.le.setValidator(QtGui.QDoubleValidator(0, 10, 1))
+        self.le.setValidator(QtGui.QDoubleValidator(0, 10, 2))
 
         self.le.textChanged.connect(lambda: self.buttonBox.buttons()[0].setEnabled(self.le.text() != ""))  # type: ignore
         self.le.setText(str(self.config.get("weight", 10)))
@@ -174,3 +176,59 @@ class RubricEditDialog(QDialog):
         self.config["page"] = int(self.combo.text())
         self.config["precision"] = int(self.precision.text())
         super().accept()
+
+
+class ControlDialog(QDialog):
+    def __init__(self, accepting, up, down, left, right, scale_up, scale_down, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Controls")
+        self.setFixedSize(120, 180)
+        self.accepting = accepting
+        # Direction buttons
+        btn_up = QPushButton("↑")
+        btn_up.clicked.connect(up)
+        btn_down = QPushButton("↓")
+        btn_down.clicked.connect(down)
+        btn_left = QPushButton("←")
+        btn_left.clicked.connect(left)
+        btn_right = QPushButton("→")
+        btn_right.clicked.connect(right)
+
+        # Scale buttons
+        btn_scale_up = QPushButton("+")
+        btn_scale_up.clicked.connect(scale_up)
+        btn_scale_down = QPushButton("-")
+        btn_scale_down.clicked.connect(scale_down)
+
+        # Compact size
+        for b in [btn_up, btn_down, btn_left, btn_right, btn_scale_up, btn_scale_down]:
+            b.setFixedSize(28, 28)
+
+        grid = QGridLayout()
+        grid.setSpacing(2)
+        grid.setContentsMargins(2, 2, 2, 2)
+
+        grid.addWidget(btn_up, 0, 1)
+        grid.addWidget(btn_left, 1, 0)
+        grid.addWidget(btn_right, 1, 2)
+        grid.addWidget(btn_down, 2, 1)
+
+        grid.addWidget(btn_scale_down, 3, 0)
+        grid.addWidget(btn_scale_up, 3, 2)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok)
+        buttons.accepted.connect(self.close)
+
+        layout = QVBoxLayout()
+        layout.setSpacing(3)
+        layout.addLayout(grid)
+        buttons.setContentsMargins(2,10,2,2)
+        grid.addWidget(buttons, 4, 0, 1, 3)
+
+        self.setLayout(layout)
+    # on ok clicked
+    def close(self):
+        super().close()
+        print("diocaning")
+        self.accepting()
+

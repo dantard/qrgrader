@@ -20,6 +20,7 @@ from qrgrader.common import check_workspace, get_workspace_paths, get_temp_paths
     StudentsData
 from qrgrader.page_processor import PageProcessor
 from qrgrader.utils import makedir
+from datetime import timedelta
 
 
 def main():
@@ -198,6 +199,9 @@ def main():
         if total_length <= 0:
             print("No pages to process. Exiting.")
             sys.exit(0)
+        time_begin = time.time()
+        time_remaining = 0
+        elapsed = 0
 
         with Manager() as manager:
 
@@ -232,7 +236,18 @@ def main():
 
                     #while len([p for p in processes if p.is_alive()]) >= 4:
                     #    time.sleep(0.25)
-                    print(f"   Processed {done}/{total_length} ({100*done/total_length:.2f}%) ({len(detected)} codes found)", end="\r")
+                    remaining = total_length - done
+                    if done < 10:
+                        time_remaining = "?"
+                    elif done % 10 == 0:
+                        elapsed = time.time() - time_begin
+                        time_begin = time.time()
+
+                    time_remaining = elapsed / 10 * remaining
+                    h, r = divmod(int(time_remaining), 3600)
+                    m, s = divmod(r, 60)
+
+                    print(f"   Processed {done}/{total_length} ({100*done/total_length:.2f}%) ({len(detected)} codes found) remaining: {h:02}:{m:02}:{s:02}", end="\r")
 
             print() # for the \r at the end of the last line
 
