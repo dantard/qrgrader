@@ -108,7 +108,7 @@ class PageProcessor(Process):
                     cv2.rectangle(image, (px, py), (px + pw, py + ph), (0, 0, 255), 1)
 
                 for text, cx, cy, cw, ch in get_codes(patch):
-                    detected.append(Code(text, px + cx, py + cy, cw, ch, page, self.index))
+                    detected.append(Code(text, px + cx, py + cy, cw, ch, page, self.index, scanned=1))
 
         # Try again with the whole page
         page = detected.get_page()

@@ -81,12 +81,19 @@ class CodeSet:
         with open(file_name, "w", encoding='utf-8') as f:
             for code in self.codes.values():
                 f.write(
-                    code.data + ",{:.2f},{:.2f},{:.2f},{:.2f},{},{},{:d}\n".format(code.x, code.y, code.w, code.h, code.page, code.pdf_page, int(code.marked)))
+                    code.data + ",{:.2f},{:.2f},{:.2f},{:.2f},{},{},{:d},{:d}\n".format(code.x,
+                                                                                        code.y,
+                                                                                        code.w,
+                                                                                        code.h,
+                                                                                        code.page,
+                                                                                        code.pdf_page,
+                                                                                        int(code.marked),
+                                                                                        int(code.scanned)))
 
     def load(self, file_name):
         if not os.path.exists(file_name):
             return False
-
+        #print("Loading codes from {}".format(file_name))
         with open(file_name, "r", encoding='utf-8') as f:
             for line in f:
                 fields = line.strip().split(",")
@@ -94,6 +101,8 @@ class CodeSet:
                 code = Code(data, float(x), float(y), float(w), float(h), int(page), int(pdf_page))
                 if len(fields) > 7:
                     code.set_marked(int(fields[7]))
+                if len(fields) > 8:
+                    code.scanned = int(fields[8])
                 self.append(code)
         return True
 

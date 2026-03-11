@@ -5,7 +5,7 @@ class Code:
     TYPE_N = 3
     TYPE_O = 4
 
-    def __init__(self, data, x, y, w, h, page=None, pdf_page=None):
+    def __init__(self, data, x, y, w, h, page=None, pdf_page=None, scanned=0):
         self.data = data
         self.x = x
         self.y = y
@@ -15,6 +15,7 @@ class Code:
         self.exam = None
         self.page = page
         self.pdf_page = pdf_page
+        self.scanned = scanned
         if self.data[0] == "O":
             self.unique = int(self.data[1:10])
             self.date = int(self.data[1:7])
@@ -100,7 +101,7 @@ class Code:
         if self.type == self.TYPE_A:
             return f"({self.data}, {self.exam}, {self.x}, {self.y}, {self.w}, {self.h}, PAG:{self.page}, Q:{self.question}, A:{self.answer}), M:{self.marked}"
         elif self.type in [self.TYPE_P, self.TYPE_Q]:
-            return f"({self.data}, {self.exam}, {self.x}, {self.y}, {self.w}, {self.h}, PAG:{self.page})"
+            return f"({self.data}, {self.exam}, {self.x}, {self.y}, {self.w}, {self.h}, PAG:{self.page}, SCN:{self.scanned})"
         elif self.type == self.TYPE_N:
             return f"({self.data}, {self.exam}, {self.x}, {self.y}, {self.w}, {self.h}, PAG:{self.page}, NUM:{self.number})"
         elif self.type == self.TYPE_O:

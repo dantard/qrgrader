@@ -199,6 +199,8 @@ class MainWindow(QMainWindow):
                     item.setText(2, "!")
                 elif nia is None or type(nia) == str:
                     item.setText(2, "@")
+                elif self.get_missing_pq_marks(exam_id):
+                    item.setText(2, "P")
                 else:
                     item.setText(2, "")
 
@@ -321,8 +323,9 @@ class MainWindow(QMainWindow):
         self.type_a = self.detected.select(type=Code.TYPE_A)
         self.type_n = self.detected.select(type=Code.TYPE_N)
 
-        #self.type_p = self.detected.select(type=Code.TYPE_P)
-        #self.type_q = self.detected.select(type=Code.TYPE_Q)
+        self.type_p = self.detected.select(type=Code.TYPE_P)
+        self.type_q = self.detected.select(type=Code.TYPE_Q)
+
 
     def load_tables(self):
 
@@ -561,17 +564,11 @@ class MainWindow(QMainWindow):
         return yellow
 
     def get_missing_pq_marks(self, exam_id):
-        yellow = []
         exam_id = exam_id % 1000
-        type_a = self.type_a.select(exam=exam_id)
-        for question in type_a.get_questions():
-            answers = type_a.select(question=question)
-            marked = sum([1 for x in answers if x.marked])
-            if marked > 1:
-                for answer in answers:
-                    if answer.marked:
-                        yellow.append(answer)
-        return yellow
+        type_p = self.type_p.select(exam=exam_id, scanned=1)
+        type_q = self.type_q.select(exam=exam_id, scanned=1)
+        return len(type_p) != len(type_q)
+
 
     def code_clicked(self, code):
         self.changed.append(code)
