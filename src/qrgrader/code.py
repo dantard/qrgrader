@@ -100,7 +100,7 @@ class Code:
         if self.type == self.TYPE_A:
             return f"({self.data}, {self.exam}, {self.x}, {self.y}, {self.w}, {self.h}, PAG:{self.page}, Q:{self.question}, A:{self.answer}), M:{self.marked}"
         elif self.type in [self.TYPE_P, self.TYPE_Q]:
-            return f"({self.data}, {self.exam}, {self.x}, {self.y}, {self.w}, {self.h}, PAG:{self.page}, SCN:{self.scanned})"
+            return f"({self.data}, {self.exam}, {self.x}, {self.y}, {self.w}, {self.h}, PAG:{self.page})"
         elif self.type == self.TYPE_N:
             return f"({self.data}, {self.exam}, {self.x}, {self.y}, {self.w}, {self.h}, PAG:{self.page}, NUM:{self.number})"
         elif self.type == self.TYPE_O:

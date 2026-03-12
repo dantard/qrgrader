@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import random
+import signal
 from random import shuffle
 
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
@@ -199,8 +200,8 @@ class MainWindow(QMainWindow):
                     item.setText(2, "!")
                 elif nia is None or type(nia) == str:
                     item.setText(2, "@")
-                elif self.get_missing_pq_marks(exam_id):
-                    item.setText(2, "P")
+                # elif self.get_missing_pq_marks(exam_id):
+                #     item.setText(2, "P")
                 else:
                     item.setText(2, "")
 
@@ -617,6 +618,9 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+
+    # Let Python's signal handler run every 500ms
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     if not check_workspace():
         print("ERROR: qrgrader must be run from the workspace root")

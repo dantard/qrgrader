@@ -1,4 +1,5 @@
 import argparse
+import math
 import os
 import sys
 import time
@@ -40,6 +41,7 @@ class PageProcessor(Process):
         page = doc[self.index]
         image = pix2np(page.get_pixmap(matrix=self.matrix))  # noqa
         doc.close()
+
 
         # Find page, orientation and rotate page
         rotation = None
@@ -90,7 +92,7 @@ class PageProcessor(Process):
             image = cv2.rotate(image, rotation)
 
         # Get the page number if we got it
-        page = detected.get_page() if detected.get_page() is not None else 0
+        page = detected.get_page()
 
         # Clear the detected because the
         # page may have been rotated
@@ -108,29 +110,25 @@ class PageProcessor(Process):
                     cv2.rectangle(image, (px, py), (px + pw, py + ph), (0, 0, 255), 1)
 
                 for text, cx, cy, cw, ch in get_codes(patch):
-                    detected.append(Code(text, px + cx, py + cy, cw, ch, page, self.index, scanned=1))
+                    detected.append(Code(text, px + cx, py + cy, cw, ch, page, self.index))
 
         # Try again with the whole page
-        page = detected.get_page()
+        page = detected.get_page() if page is None else page
         exam = detected.get_exam_id()
 
         # If we did not find the page number, try to find it in the generated detected
         if page is None:
-            for code in detected:
-                code = self.generated.get(code)
-                if code := self.generated.get(code):
-                    page = code.get_page()
-                    exam = code.get_exam_id()
-                    break
-            for code in detected:
-                code.set_page(page)
+            if len(detected) > 0:
+                page = self.generated.get(detected.first()).page
+                for code in detected:
+                    code.set_page(page)
 
         if self.resize != 1.0:
             image = cv2.resize(image, (int(image.shape[1] * self.resize), int(image.shape[0] * self.resize)),
                                interpolation=cv2.INTER_AREA)
 
-        if detected.get_page() is not None:
-            cv2.imwrite(self.dir_images + os.sep + "page-{}-{}-{:03d}.jpg".format(detected.get_date(), detected.get_exam_id(), detected.get_page()), image)
+        if page is not None:
+            cv2.imwrite(self.dir_images + os.sep + "page-{}-{}-{:03d}.jpg".format(detected.get_date(), detected.get_exam_id(), page), image)
         elif detected.get_exam_id():
             cv2.imwrite(self.dir_images + os.sep + "page-{}-{}-{:03d}.jpg".format(detected.get_date(), detected.get_exam_id(), 0), image)
         else:
@@ -139,35 +137,34 @@ class PageProcessor(Process):
         # # Compute the transformation
         generated_page_codeset = PageCodeSet(self.generated.select(exam=exam, page=page))
 
-        # Compute the transformation
-        if detected.get_p() is not None and detected.get_q() is not None:
-            p11 = generated_page_codeset.get_p().get_pos()
-            p12 = generated_page_codeset.get_q().get_pos()
-            p21 = detected.get_p().get_pos()
-            p22 = detected.get_q().get_pos()
-            #scale, rot, delta = compute_similarity_transform(p21, p22, p11, p12)
+        # We will use the two codes that are the farthest apart to compute
+        # the transformation, if we have at least two codes detected
+        max_dist, codes = 0, None
+        for code1 in detected:
+            for code2 in detected:
+                if code1!=code2:
+                    dist = math.sqrt((code1.get_pos()[0] - code2.get_pos()[0]) ** 2 + (code1.get_pos()[1] - code2.get_pos()[1]) ** 2)
+                    if dist > max_dist:
+                        max_dist = dist
+                        codes = (code1, code2)
+
+        if codes is not None:
+            # we have at least two codes detected, we can use them to compute the transformation
+            code1, code2 = codes[0], codes[1]
+            p11 = self.generated.get(code1).get_pos()
+            p12 = self.generated.get(code2).get_pos()
+            p21 = code1.get_pos()
+            p22 = code2.get_pos()
             transform = get_similarity_transform([p11, p12], [p21, p22]) # noqa
-        elif detected.get_p() is not None:
-            x1, y1 = detected.get_p().get_pos()
-            x2, y2 = generated_page_codeset.get_p().get_pos()
-            transform = lambda pt: (pt[0] + x2 - x1, pt[1] + y2 - y1) # noqa
-        elif detected.get_q() is not None:
-            x1, y1 = detected.get_q().get_pos()
-            x2, y2 = generated_page_codeset.get_q().get_pos()
-            transform = lambda pt: (pt[0] + x2 - x1, pt[1] + y2 - y1) # noqa
-
-        # According to ChatGPT
-        # elif detected.get_p() is not None:
-        #     x1, y1 = generated_page_codeset.get_p().get_pos()
-        #     x2, y2 = detected.get_p().get_pos()
-        #     transform = lambda pt: (pt[0] + x2 - x1, pt[1] + y2 - y1)  # noqa
-        # elif detected.get_q() is not None:
-        #     x1, y1 = generated_page_codeset.get_q().get_pos()
-        #     x2, y2 = detected.get_q().get_pos()
-        #     transform = lambda pt: (pt[0] + x2 - x1, pt[1] + y2 - y1)  # noqa
-
+        elif len(detected) > 0:
+            # we have detected just one code, we can use it to compute the transformation
+            code1 = detected.first()
+            p11 = self.generated.get(code1).get_pos()
+            p21 = code1.get_pos()
+            transform = lambda pt: (pt[0] + (p21[0] - p11[0]), pt[1] + (p21[1] - p11[1]))
         else:
-            transform = lambda pt: (pt[0], pt[1]) # noqa # No transformation needed
+            # No codes detected, we can not compute the transformation, we will just use the identity
+            transform = lambda pt: pt
 
         # TODO: NOTHING TO DO, JUST A NOTE
         # TODO: ATTENTION! This is the KEY: ALL THE CODES will be present in the detected set,
