@@ -341,11 +341,16 @@ class Rubric(QListWidget):
             row = "EXAM_ID\tSCORE"
             for button_name, button_config in filtered.items():
                 row += "\t" + button_name
+            f.write(row + "\n")
+
+            row = "\tWeight"
+            for button_name, button_config in filtered.items():
+                row += "\t" + f"{button_config.get("weight", 1)}"
 
             f.write(row + "\n")
 
             # SCORES
-            row = " \t "
+            row = "\tValue"
             for button_name, button_config in filtered.items():
                 if button_config.get("type") == 'button':
                     row += "\t" + "{:.2f}".format(button_config.get("full_value", 1))
@@ -375,7 +380,7 @@ class Rubric(QListWidget):
             self.scores = dict(sorted(self.scores.items()))
 
             # VALUES
-            current_row = 2
+            current_row = 3
             for exam_id, exam_score_items in self.scores.items():
                 current_row += 1
 
@@ -383,10 +388,11 @@ class Rubric(QListWidget):
                 suma = "SUMIF({0"
                 row2 = "(0"
                 for col in normal:
-                    full_value = gspread.utils.rowcol_to_a1(2, col)
+                    full_value = gspread.utils.rowcol_to_a1(3, col)
+                    weight = gspread.utils.rowcol_to_a1(2, col)
                     value = gspread.utils.rowcol_to_a1(current_row, col)
                     row2 += "+" + full_value + "*" + value
-                    suma += "," + full_value
+                    suma += "," + full_value + "*" + weight
                 suma = suma + '},">0")'
                 row2 += ")/" + suma
 
