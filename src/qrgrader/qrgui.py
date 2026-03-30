@@ -57,11 +57,12 @@ class EditableLabel(QLabel):
             self.new_value.emit(a)
 
 class MainWindow(QMainWindow):
-    def __init__(self, schema_filenames, randomize):
+    def __init__(self, schema_filenames, args):
         super().__init__()
         makedir(os.path.expanduser("~") + os.sep + ".config/qrgrader/")
 
-        self.randomize = randomize
+        self.randomize = args["random"]
+        self.locked = args["lock"]
         self.config = EasyConfig2(filename=os.path.expanduser("~") + os.sep + ".config/qrgrader/qrgrader.yaml")
         self.cfg_geometry = self.config.root().addPrivate("geometry", default=[0, 0, 1200, 1000, False])
         self.cfg_buttons_height = self.config.root().addPrivate("buttons_height")
@@ -158,9 +159,12 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(self.swik)
         self.splitter.addWidget(helper)
 
-        self.setWindowTitle("QR Grader")
+        self.setWindowTitle("QRGrader" + (" - Locked" if self.locked else ""))
         self.shortcut = QShortcut(QKeySequence('Ctrl+F'), self)
         self.shortcut.activated.connect(self.find_people)
+        self.shortcut2 = QShortcut(QKeySequence('Ctrl+L'), self)
+        self.shortcut2.activated.connect(self.toggle_locked)
+
         self.show()
 
 
@@ -215,6 +219,13 @@ class MainWindow(QMainWindow):
 
             # add shortcut to find people
         QTimer.singleShot(100, delayed)
+
+    def toggle_locked(self):
+        self.locked = not self.locked
+        self.setWindowTitle("QRGrader" + (" - Locked" if self.locked else ""))
+
+        for rubric in self.rubrics:
+            rubric.lock(self.locked)
 
     def contextMenuEvent(self, event):
         pos = self.swik.view.mapFrom(self, event.pos())
@@ -358,6 +369,7 @@ class MainWindow(QMainWindow):
             r1.button_or_value_changed.connect(self.rubric_button_or_value_changed)
             r1.goto_next.connect(self.goto_next)
             r1.filtered.connect(self.rubric_filtered)
+            r1.lock(self.locked)
 
             self.rubrics_tabs.addTab(r1, name)
             self.rubrics.append(r1)
@@ -443,6 +455,7 @@ class MainWindow(QMainWindow):
 
     def load_finished(self):
 
+        self.rubric_tab_changed(0)
         self.process_exam()
 
         nia = self.xls_nia.get_nia(self.current_exam)
@@ -630,6 +643,7 @@ def main():
     parser.add_argument('-s', '--schema', help='Schema to be used', default=[], action="append")
     parser.add_argument('-c', '--create', help="Create schema if doesn't exist", action="store_true")
     parser.add_argument('-r', '--random', help="Randomize exam order", action="store_true")
+    parser.add_argument('-l', '--lock', help="Lock Rubrics", action="store_true")
     args = vars(parser.parse_args())
 
     filenames = []
@@ -650,7 +664,7 @@ def main():
                 sys.exit(1)
         filenames.append(filename)
 
-    main = MainWindow(filenames, args["random"])
+    main = MainWindow(filenames, args)
     sys.exit(app.exec_())
 
 
