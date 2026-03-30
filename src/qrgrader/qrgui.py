@@ -89,8 +89,8 @@ class MainWindow(QMainWindow):
 
         self.prefix = get_prefix()
         self.xls_questions = Questions(self.dir_xls + self.prefix + "questions.csv")
-        self.xls_nia = Nia(self.dir_xls + self.prefix + "nia.csv")
         self.xls_data = StudentsData(self.dir_xls + self.prefix + "data.csv")
+        self.xls_nia = Nia(self.dir_xls + self.prefix + "nia.csv")
 
         self.central_widget = QWidget()
         self.main_layout = QVBoxLayout()
@@ -203,7 +203,10 @@ class MainWindow(QMainWindow):
                 if len(self.get_multiple_marks(exam_id)) > 0:
                     item.setText(2, "!")
                 elif nia is None or type(nia) == str:
-                    item.setText(2, "@")
+                    if nia == "INVALID_NIA":
+                        item.setText(2, "?")
+                    else:
+                        item.setText(2, "@")
                 # elif self.get_missing_pq_marks(exam_id):
                 #     item.setText(2, "P")
                 else:
@@ -351,6 +354,8 @@ class MainWindow(QMainWindow):
 
         if not self.xls_data.load():
             print("WARNING: data.csv file not present")
+        else:
+            self.xls_nia.set_valid_nias(self.xls_data.get_all_nias())
 
     def rubric_filtered(self):
         for index in range(self.pdf_tree.topLevelItemCount()):
