@@ -126,16 +126,23 @@ class StudentsData:
 
         return by_name.iloc[0]["NIA"]
 
+    def get_all_nias(self):
+        if self.data is None:
+            return []
+        return self.data["NIA"].tolist()
+
 
 class Nia:
 
     def __init__(self, filename):
+        self.valid_nias = []
         self.filename = filename
         self.nia = None
 
     def load(self):
         if os.path.exists(self.filename):
             self.nia = pandas.read_csv(self.filename, sep='\t', header=0)
+            self.all_nia = self.nia["NIA"].tolist()
             return True
         return False
 
@@ -145,6 +152,8 @@ class Nia:
         if by_exam.empty or by_exam.iloc[0]["NIA"] is None:
             return None
         nia = by_exam.iloc[0]["NIA"]
+        if len(self.valid_nias) > 0 and nia not in self.valid_nias:
+            return "INVALID_NIA"
         return int(nia) if str(nia).isdigit() else str(nia)
 
     def get_exam(self, nia):
@@ -158,6 +167,9 @@ class Nia:
         # EXAM FORMAT: 240509002
         self.nia.loc[self.nia['EXAM'] == int(exam_id), 'NIA'] = int(nia)
 
+    def set_valid_nias(self, nias):
+        self.valid_nias = nias
+        print("Valid NIAs set to: " + ", ".join(str(nia) for nia in nias))
 
     def save(self):
         if self.nia is None:
