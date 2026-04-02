@@ -73,11 +73,12 @@ class DoubleClickableLabel(QLabel):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, schema_filenames, randomize):
+    def __init__(self, schema_filenames, args):
         super().__init__()
         makedir(os.path.expanduser("~") + os.sep + ".config/qrgrader/")
 
-        self.randomize = randomize
+        self.randomize = args["random"]
+        self.locked = args["lock"]
         self.config = EasyConfig2(filename=os.path.expanduser("~") + os.sep + ".config/qrgrader/qrgrader.yaml")
         self.cfg_geometry = self.config.root().addPrivate("geometry", default=[0, 0, 1200, 1000, False])
         self.cfg_buttons_height = self.config.root().addPrivate("buttons_height")
@@ -105,6 +106,7 @@ class MainWindow(QMainWindow):
         self.prefix = get_prefix()
         self.xls_questions = Questions(self.dir_xls + self.prefix + "questions.csv")
         self.xls_data = StudentsData(self.dir_xls + self.prefix + "data.csv")
+        #self.xls_nia = Nia(self.dir_xls + self.prefix + "nia.csv")
         self.xls_nia = Nia(self.dir_xls + self.prefix + "nia.csv")
 
         self.central_widget = QWidget()
@@ -176,9 +178,12 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(self.swik)
         self.splitter.addWidget(helper)
 
-        self.setWindowTitle("QR Grader")
+        self.setWindowTitle("QRGrader" + (" - Locked" if self.locked else ""))
         self.shortcut = QShortcut(QKeySequence('Ctrl+F'), self)
         self.shortcut.activated.connect(self.find_people)
+        self.shortcut2 = QShortcut(QKeySequence('Ctrl+L'), self)
+        self.shortcut2.activated.connect(self.toggle_locked)
+
         self.show()
 
         files = os.listdir(self.dir_publish)
@@ -212,18 +217,12 @@ class MainWindow(QMainWindow):
                 item.setText(3, str(round(score, 2)))
 
                 # Check if multiple marks or bad NIA
-                nia = self.xls_nia.get_nia(exam_id)
-                if len(self.get_multiple_marks(exam_id)) > 0:
-                    item.setText(2, "!")
-                elif nia is None or type(nia) == str:
-                    if nia == "INVALID_NIA":
-                        item.setText(2, "?")
-                    else:
-                        item.setText(2, "@")
-                # elif self.get_missing_pq_marks(exam_id):
-                #     item.setText(2, "P")
+                symbol, _, nia = self.xls_nia.get_nia(exam_id)
+                multiple = self.get_number_of_multiple_marked_questions(exam_id)
+                if  multiple > 0:
+                    item.setText(2, str(multiple))
                 else:
-                    item.setText(2, "")
+                    item.setText(2, symbol)
 
                 if len(self.rubrics) > 0:
                     self.update_done_color(item)
@@ -250,6 +249,13 @@ class MainWindow(QMainWindow):
         self.xls_nia.set_nia(self.current_exam, nia)
         self.process_exam()
         self.update_labels()
+
+    def toggle_locked(self):
+        self.locked = not self.locked
+        self.setWindowTitle("QRGrader" + (" - Locked" if self.locked else ""))
+
+        for rubric in self.rubrics:
+            rubric.lock(self.locked)
 
     def contextMenuEvent(self, event):
         pos = self.swik.view.mapFrom(self, event.pos())
@@ -293,7 +299,7 @@ class MainWindow(QMainWindow):
             item.setForeground(1, Qt.black)
             symb = "✓"
 
-        if item.text(2) not in ["!", "@"]:
+        if item.text(2) not in ["!", "@", "?", "D"]:
             item.setText(2, symb)
 
     def update_number_assessed(self):
@@ -321,13 +327,12 @@ class MainWindow(QMainWindow):
         self.xls_nia.save()
         item = self.pdf_tree.currentItem()
         exam_id = int(item.text(1))
-        nia = self.xls_nia.get_nia(exam_id)
-        if len(self.get_multiple_marks(exam_id)) > 0:
-            item.setText(2, "!")
-        elif nia is None or type(nia) == str:
-            item.setText(2, "@")
+        symbol, _, nia = self.xls_nia.get_nia(exam_id)
+        multiple = self.get_number_of_multiple_marked_questions(exam_id)
+        if multiple > 0:
+            item.setText(2, str(multiple))
         else:
-            item.setText(2, "")
+            item.setText(2, symbol)
 
     def find_people(self):
         text, ok = QInputDialog.getText(self, "Find People", "Enter NIA or Name:")
@@ -401,6 +406,7 @@ class MainWindow(QMainWindow):
             r1.button_or_value_changed.connect(self.rubric_button_or_value_changed)
             r1.goto_next.connect(self.goto_next)
             r1.filtered.connect(self.rubric_filtered)
+            r1.lock(self.locked)
 
             self.rubrics_tabs.addTab(r1, name)
             self.rubrics.append(r1)
@@ -487,10 +493,17 @@ class MainWindow(QMainWindow):
         self.swik.open(f"{self.dir_publish}{self.current_exam}.pdf", ratio=ratio, index=index)
 
     def update_labels(self):
-        nia = self.xls_nia.get_nia(self.current_exam)
+        symbol, text, nia = self.xls_nia.get_nia(self.current_exam)
         self.nia_lbl.setText(str(nia))
         self.name_lbl.setText(str(self.xls_data.get_name(nia)))
         self.group_lbl.setText(str(self.xls_data.get_group(nia)))
+
+    def load_finished(self):
+
+        self.rubric_tab_changed(0)
+        self.process_exam()
+        self.update_labels()
+
 
     def load_finished(self):
 
@@ -608,6 +621,18 @@ class MainWindow(QMainWindow):
                         yellow.append(answer)
         return yellow
 
+    def get_number_of_multiple_marked_questions(self, exam_id):
+        count = 0
+        exam_id = exam_id % 1000
+        type_a = self.type_a.select(exam=exam_id)
+        for question in type_a.get_questions():
+            answers = type_a.select(question=question)
+            marked = sum([1 for x in answers if x.marked])
+            if marked > 1:
+                count += 1
+        return count
+
+
     def get_missing_pq_marks(self, exam_id):
         exam_id = exam_id % 1000
         type_p = self.type_p.select(exam=exam_id, marked=1)
@@ -624,14 +649,12 @@ class MainWindow(QMainWindow):
         self.detected.save(self.dir_data + self.prefix + "detected.csv")
 
         item = self.pdf_tree.currentItem()
-        nia = self.xls_nia.get_nia(code.unique)
-
-        if len(self.get_multiple_marks(int(code.exam))) > 0:
-            item.setText(2, "!")
-        elif nia is None or type(nia) == str:
-            item.setText(2, "@")
+        symbol, _, nia = self.xls_nia.get_nia(code.unique)
+        multiple = self.get_number_of_multiple_marked_questions(code.exam)
+        if multiple > 0:
+            item.setText(2, str(multiple))
         else:
-            item.setText(2, "")
+            item.setText(2, symbol)
 
     def move_codes(self, page, x, y, scale=1):
         page_codes_type_a = self.type_a.select(exam=self.current_exam % 1000, pdf_page=page + 1)
@@ -674,6 +697,7 @@ def main():
     parser.add_argument('-s', '--schema', help='Schema to be used', default=[], action="append")
     parser.add_argument('-c', '--create', help="Create schema if doesn't exist", action="store_true")
     parser.add_argument('-r', '--random', help="Randomize exam order", action="store_true")
+    parser.add_argument('-l', '--lock', help="Lock Rubrics", action="store_true")
     args = vars(parser.parse_args())
 
     filenames = []
@@ -694,7 +718,7 @@ def main():
                 sys.exit(1)
         filenames.append(filename)
 
-    main = MainWindow(filenames, args["random"])
+    main = MainWindow(filenames, args)
     sys.exit(app.exec_())
 
 

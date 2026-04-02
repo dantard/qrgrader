@@ -5,7 +5,7 @@ import sys
 
 import yaml
 
-from qrgrader.common import check_workspace, Nia, get_workspace_paths, get_date
+from qrgrader.common import check_workspace, Nia, get_workspace_paths, get_date, Password
 from qrgrader.encrypt import decrypt
 from qrgrader.secret import get_secret
 from qrgrader.utils import makedir
@@ -104,21 +104,33 @@ def main():
             nias = Nia(dir_xls + os.sep + str(date) + "_nia.csv")
             nias.load()
 
+            passwd = Password(dir_xls + os.sep + str(date) + "_password.csv")
+            has_password = passwd.load()
+
             files = gd.ls(folder_id)
 
             files.sort(key=lambda x: x[0].lower())
 
             with open("results" + os.sep + "xls" + os.sep + date + "_pdf.csv", "w", encoding='utf-8') as f:
-                f.write("EXAM ID" + "\t" + "NIA" + "\t" + "LINK" + "\t" + "QUIZ" + "\t" + "OPEN" + "\t" + "TOTAL" + "\n")
+                if has_password:
+                    f.write(
+                        "EXAM ID" + "\t" + "NIA" + "\t" + "LINK" + "\t" + "PASSWORD" + "\t" + "QUIZ" + "\t" + "OPEN" + "\t" + "TOTAL" + "\n")
+                else:
+                    f.write("EXAM ID" + "\t" + "NIA" + "\t" + "LINK" + "\t" + "QUIZ" + "\t" + "OPEN" + "\t" + "TOTAL" + "\n")
+
                 for i, file in enumerate(files):
                     name = file[0].replace(".pdf", "")
                     link = "https://drive.google.com/u/3/uc?id=" + file[1]
-                    nia = nias.get_nia(name)
+                    _, nia, _ = nias.get_nia(name)
                     fb_quiz = "=round(VLOOKUP(A" + str(i+2) + ",'"+date+"_raw'!A:Z,4,false),2)"
                     fb_open = "=round(VLOOKUP(A" + str(i + 2) + ",'"+date+"_raw'!A:Z,5,false),2)"
                     fb_total = "=round(VLOOKUP(A" + str(i + 2) + ",'"+date+"_raw'!A:Z,6,false),1)"
 
-                    f.write(name + "\t" + str(nia) + "\t" + link + "\t" +
+                    if has_password:
+                        f.write(name + "\t" + str(nia) + "\t" + link + "\t" + passwd.get_password(name) + "\t" +
+                                fb_quiz + "\t" + fb_open + "\t" + fb_total + "\n")
+                    else:
+                        f.write(name + "\t" + str(nia) + "\t" + link + "\t" +
                             fb_quiz + "\t" + fb_open + "\t" + fb_total + "\n")
 
             print("Written to results/xls/{}_pdf.csv ({} rows)".format(date, len(files)))

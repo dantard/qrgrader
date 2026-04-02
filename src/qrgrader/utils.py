@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import zxingcpp
-
+import hashlib
 
 def pix2np(pix):
     im = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
@@ -148,3 +148,12 @@ def makedir(path, clear=False):
             for item in directory.glob('*'):
                 if item.is_file() or item.is_symlink():
                     item.unlink()
+
+def file_hash(path, length=256):
+    try:
+        with open(path, 'rb') as f:
+            hash = hashlib.file_digest(f, 'sha256').hexdigest()
+        return hash[:length]
+    except Exception as e:
+        print(f"Error computing hash for {path}: {e}")
+        return None

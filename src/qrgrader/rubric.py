@@ -4,7 +4,7 @@ import os
 
 import gspread.utils
 import yaml
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QEvent
 from PyQt5.QtGui import QDrag, QPixmap, QPainter
 from PyQt5.QtWidgets import (QListWidget,
                              QAbstractItemView, QListWidgetItem, QMenu, QMessageBox,
@@ -78,6 +78,7 @@ class Rubric(QListWidget):
         self.populate()
         self.load_scores()
 
+
     def toggle_filter(self):
         if not self.filter_btn.isChecked():
             self.filters = None
@@ -106,7 +107,6 @@ class Rubric(QListWidget):
         ok = True
         for k, v in self.filters.items():
             button_score = exam_scores.get(k, {})
-            print("Filtering:", k, v, button_score)
             ok = ok and button_score.get("value", -1) == v.get("value")
         return ok
 
@@ -321,6 +321,9 @@ class Rubric(QListWidget):
             points = points / total * self.config.get("weight", 10)
         points = round(points, self.config.get("precision", 2))
         return points, self.config.get("weight", 10)
+
+    def lock(self, value):
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, value)
 
     def save_scores(self):
         with open(self.scores_filename, "w", encoding='utf-8') as file:

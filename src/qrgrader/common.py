@@ -142,6 +142,75 @@ class StudentsData:
         return self.data["GROUP"].tolist()
 
 
+class Password:
+
+    def __init__(self, filename):
+        self.filename = filename
+        self.password = None
+
+    def load(self):
+        if os.path.exists(self.filename):
+            if os.path.exists(self.filename):
+                self.password = pandas.read_csv(self.filename, sep='\t', header=0)
+                return True
+            return False
+
+    def get_password(self, exam_id):
+        if self.password is None:
+            return None
+        by_exam = self.password[self.password["EXAM ID"] == int(exam_id)]
+        if by_exam.empty or by_exam.iloc[0]["PASSWORD"] is None:
+            return None
+        return by_exam.iloc[0]["PASSWORD"]
+
+class Nia2:
+
+    def __init__(self, type_n):
+        self.valid_nias = []
+        self.codes = type_n
+        self.nia = None
+
+    def load(self):
+        exams = set()
+        for code in self.codes:
+            exams.add(code[:11])
+        print(exams)
+
+    def get_nia(self, exam):
+        # EXAM FORMAT: 240509002
+        by_exam = self.nia[self.nia["EXAM"] == int(exam)]
+        if by_exam.empty or by_exam.iloc[0]["NIA"] is None:
+            return "?", "No exam", None
+        nia = by_exam.iloc[0]["NIA"]
+        if nia is None:
+            return "?", "No NIA", None
+        elif str(nia).isdigit():
+            if self.all_nia.count(nia) > 1:
+                return "D", str(nia), nia
+            elif len(self.valid_nias) > 0 and nia not in self.valid_nias:
+                return "?", str(nia), nia
+            return "", str(nia), int(nia)
+        return "#", str(nia), None
+
+    def get_exam(self, nia):
+        by_nia = self.nia[self.nia["NIA"] == nia]
+        if by_nia.empty:
+            return None
+
+        return by_nia.iloc[0]["EXAM"]
+
+    def set_nia(self, exam_id, nia):
+        # EXAM FORMAT: 240509002
+        self.nia.loc[self.nia['EXAM'] == int(exam_id), 'NIA'] = int(nia)
+
+    def set_valid_nias(self, nias):
+        self.valid_nias = nias
+
+    def save(self):
+        if self.nia is None:
+            return False
+        self.nia.to_csv(self.filename, sep='\t', index=False)
+        return True
 class Nia:
 
     def __init__(self, filename):
@@ -160,11 +229,17 @@ class Nia:
         # EXAM FORMAT: 240509002
         by_exam = self.nia[self.nia["EXAM"] == int(exam)]
         if by_exam.empty or by_exam.iloc[0]["NIA"] is None:
-            return None
+            return "?", "No exam", None
         nia = by_exam.iloc[0]["NIA"]
-        if len(self.valid_nias) > 0 and nia not in self.valid_nias:
-            return "INVALID_NIA"
-        return int(nia) if str(nia).isdigit() else str(nia)
+        if nia is None:
+            return "?", "No NIA", None
+        elif str(nia).isdigit():
+            if self.all_nia.count(nia) > 1:
+                return "D", str(nia), nia
+            elif len(self.valid_nias) > 0 and nia not in self.valid_nias:
+                return "?", str(nia), nia
+            return "", str(nia), int(nia)
+        return "#", str(nia), None
 
     def get_exam(self, nia):
         by_nia = self.nia[self.nia["NIA"] == nia]
@@ -179,7 +254,6 @@ class Nia:
 
     def set_valid_nias(self, nias):
         self.valid_nias = nias
-        print("Valid NIAs set to: " + ", ".join(str(nia) for nia in nias))
 
     def save(self):
         if self.nia is None:
