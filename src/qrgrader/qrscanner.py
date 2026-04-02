@@ -6,7 +6,7 @@ import time
 from itertools import accumulate
 from multiprocessing import Manager, Pool, Process
 from random import randint
-
+import qrgrader.utils as utils
 import cv2
 import pandas as pd
 import pymupdf
@@ -29,6 +29,7 @@ def main():
     parser.add_argument('-a', '--annotate', help='Annotate files', action="store_true")
     parser.add_argument('-B', '--begin', type=int, help='First page to process', default=0)
     parser.add_argument('-c', '--correct', help='Correct QRs position (according to -x -y and -z)', action="store_true")
+    parser.add_argument('-C', '--encrypt', help='Encrypt PDF files', action="store_true")
     parser.add_argument('-d', '--dpi', help='Dot per inch', type=int, default=400)
     parser.add_argument('-e', '--reconstruct', help='Reconstruct exams', action="store_true")
     parser.add_argument('-E', '--end', type=int, help='Last page to process', default=None)
@@ -46,6 +47,7 @@ def main():
     parser.add_argument('-x', '--xdisp', help='Specify printer X displacement', type=float, default=0.0)
     parser.add_argument('-y', '--ydisp', help='Specify printer Y displacement', type=float, default=0.0)
     parser.add_argument('-z', '--zoom', help='Specify printer zoom', type=float, default=1.0)
+
 
 
     args = vars(parser.parse_args())
@@ -252,7 +254,7 @@ def main():
             codes.extend(detected)
             codes.save(dir_data + prefix + "detected.csv")
 
-    if args.get("reconstruct") or args.get("nia") or args.get("raw") or args.get("annotate"):
+    if args.get("reconstruct") or args.get("nia") or args.get("raw") or args.get("annotate") or args.get("encrypt"):
         codes = CodeSet()
         if not codes.load(dir_data + prefix + "detected.csv"):
             print(f"ERROR: file {os.path.basename(dir_data + prefix + 'detected.csv')} not found")
@@ -273,6 +275,7 @@ def main():
                 page.insert_image(pymupdf.Rect(0, 0, 595.28, 842), filename=dir_temp_scanner + os.sep + image)
 
             pdf_file.save(filename)
+
 
     if args.get("nia"):
         nia_filename = dir_xls + prefix + "nia.csv"
@@ -350,7 +353,8 @@ def main():
         # Insert the NIA column
         raw.insert(inserted + 2, "NIA", "")
         for exam_id in raw.iloc[:, 0].tolist():
-            raw.loc[exam_id, "NIA"] = nia.get_nia(exam_id)
+            symbol, text, _ = nia.get_nia(exam_id)
+            raw.loc[exam_id, "NIA"] = symbol + text
         inserted += 1
 
         # Insert the GRADE columns
@@ -436,6 +440,19 @@ def main():
             pdf_file.save(filename, incremental=True, encryption=PDF_ENCRYPT_KEEP)
         print()
 
+    if args.get("encrypt"):
+        dir_encrypt = dir_workspace + os.sep + "results" + os.sep + "encrypted" + os.sep
+        utils.makedir( dir_encrypt, clear=True)
+        with open(dir_xls + prefix + "password.csv", "w", encoding='utf-8') as f:
+            f.write("EXAM ID\tPASSWORD\n")
+            for exam in exams:
+                print(">> Encrypting exam {}".format(exam), end="\r")
+                filename = "{}{:03d}.pdf".format(date, exam)
+                file_hash = utils.file_hash(dir_publish + filename, 12)
+                pdf_file = pymupdf.open(dir_publish + filename)
+                pdf_file.save(dir_encrypt + filename, encryption=pymupdf.PDF_ENCRYPT_AES_256, owner_pw=file_hash, user_pw=file_hash)
+                f.write("{}\t{}\n".format(date * 1000 + exam, file_hash))
+        print()
     print("All done :)")
 
 

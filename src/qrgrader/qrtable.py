@@ -59,7 +59,8 @@ def main():
     # Insert the NIA column
     raw.insert(inserted + 2, "NIA", "")
     for exam_id in raw.iloc[:, 0].tolist():
-        raw.loc[exam_id, "NIA"] = nia.get_nia(exam_id)
+        _, text, _ = nia.get_nia(exam_id)
+        raw.loc[exam_id, "NIA"] = text
     inserted += 1
 
     # Insert the GRADE column

@@ -199,18 +199,12 @@ class MainWindow(QMainWindow):
                 item.setText(3, str(round(score,2)))
 
                 # Check if multiple marks or bad NIA
-                nia = self.xls_nia.get_nia(exam_id)
-                if len(self.get_multiple_marks(exam_id)) > 0:
-                    item.setText(2, "!")
-                elif nia is None or type(nia) == str:
-                    if nia == "INVALID_NIA":
-                        item.setText(2, "?")
-                    else:
-                        item.setText(2, "@")
-                # elif self.get_missing_pq_marks(exam_id):
-                #     item.setText(2, "P")
+                symbol, _, nia = self.xls_nia.get_nia(exam_id)
+                multiple = self.get_number_of_multiple_marked_questions(exam_id)
+                if  multiple > 0:
+                    item.setText(2, str(multiple))
                 else:
-                    item.setText(2, "")
+                    item.setText(2, symbol)
 
                 if len(self.rubrics) > 0:
                     self.update_done_color(item)
@@ -272,7 +266,7 @@ class MainWindow(QMainWindow):
             item.setForeground(1, Qt.black)
             symb = "✓"
 
-        if item.text(2) not in ["!", "@"]:
+        if item.text(2) not in ["!", "@", "?", "D"]:
             item.setText(2, symb)
 
     def update_number_assessed(self):
@@ -300,13 +294,12 @@ class MainWindow(QMainWindow):
         self.xls_nia.save()
         item = self.pdf_tree.currentItem()
         exam_id = int(item.text(1))
-        nia = self.xls_nia.get_nia(exam_id)
-        if len(self.get_multiple_marks(exam_id)) > 0:
-            item.setText(2, "!")
-        elif nia is None or type(nia) == str:
-            item.setText(2, "@")
+        symbol, _, nia = self.xls_nia.get_nia(exam_id)
+        multiple = self.get_number_of_multiple_marked_questions(exam_id)
+        if multiple > 0:
+            item.setText(2, str(multiple))
         else:
-            item.setText(2, "")
+            item.setText(2, symbol)
 
     def find_people(self):
         text, ok = QInputDialog.getText(self, "Find People", "Enter NIA or Name:")
@@ -463,8 +456,8 @@ class MainWindow(QMainWindow):
         self.rubric_tab_changed(0)
         self.process_exam()
 
-        nia = self.xls_nia.get_nia(self.current_exam)
-        self.nia_lbl.setText(str(nia))
+        symbol, text, nia = self.xls_nia.get_nia(self.current_exam)
+        self.nia_lbl.setText(text)
         self.name_lbl.setText(str(self.xls_data.get_name(nia)))
         self.group_lbl.setText(str(self.xls_data.get_group(nia)))
 
@@ -580,6 +573,18 @@ class MainWindow(QMainWindow):
                         yellow.append(answer)
         return yellow
 
+    def get_number_of_multiple_marked_questions(self, exam_id):
+        count = 0
+        exam_id = exam_id % 1000
+        type_a = self.type_a.select(exam=exam_id)
+        for question in type_a.get_questions():
+            answers = type_a.select(question=question)
+            marked = sum([1 for x in answers if x.marked])
+            if marked > 1:
+                count += 1
+        return count
+
+
     def get_missing_pq_marks(self, exam_id):
         exam_id = exam_id % 1000
         type_p = self.type_p.select(exam=exam_id, marked=1)
@@ -597,14 +602,12 @@ class MainWindow(QMainWindow):
         self.detected.save(self.dir_data + self.prefix + "detected.csv")
 
         item = self.pdf_tree.currentItem()
-        nia = self.xls_nia.get_nia(code.unique)
-
-        if len(self.get_multiple_marks(int(code.exam))) > 0:
-            item.setText(2, "!")
-        elif nia is None or type(nia) == str:
-            item.setText(2, "@")
+        symbol, _, nia = self.xls_nia.get_nia(code.unique)
+        multiple = self.get_number_of_multiple_marked_questions(code.exam)
+        if multiple > 0:
+            item.setText(2, str(multiple))
         else:
-            item.setText(2, "")
+            item.setText(2, symbol)
 
     def move_codes(self, page, x, y, scale=1):
         page_codes_type_a = self.type_a.select(exam=self.current_exam%1000, pdf_page=page + 1)
