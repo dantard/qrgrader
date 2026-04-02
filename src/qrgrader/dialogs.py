@@ -4,7 +4,7 @@ from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (QLineEdit, QPushButton, QSpinBox, QDialog, QDialogButtonBox, QComboBox, QDoubleSpinBox,
                              QFormLayout, QCheckBox, QApplication, QDialog, QPushButton,
                              QGridLayout, QVBoxLayout, QHBoxLayout,
-                             QDialogButtonBox, QLabel)
+                             QDialogButtonBox, QLabel, QTreeWidget, QTreeWidgetItem, QHeaderView)
 
 from qrgrader.widget_utils import WidgetsRow, VBox
 
@@ -33,7 +33,8 @@ class ButtonEditDialog(QDialog):
         self.layout.addWidget(WidgetsRow("Type", self.combo))
 
         self.le = QLineEdit()
-        self.le.textChanged.connect(lambda: self.buttonBox.buttons()[0].setEnabled(self.le.text() != ""))  # type: ignore
+        self.le.textChanged.connect(
+            lambda: self.buttonBox.buttons()[0].setEnabled(self.le.text() != ""))  # type: ignore
         self.le.setText(button.get_name() if button is not None else "")
         self.layout.addWidget(WidgetsRow("Name", self.le))
 
@@ -159,7 +160,8 @@ class RubricEditDialog(QDialog):
         # limit to 1 decimal
         self.le.setValidator(QtGui.QDoubleValidator(0, 10, 2))
 
-        self.le.textChanged.connect(lambda: self.buttonBox.buttons()[0].setEnabled(self.le.text() != ""))  # type: ignore
+        self.le.textChanged.connect(
+            lambda: self.buttonBox.buttons()[0].setEnabled(self.le.text() != ""))  # type: ignore
         self.le.setText(str(self.config.get("weight", 10)))
         self.layout.addRow("Weight", self.le)
 
@@ -167,7 +169,6 @@ class RubricEditDialog(QDialog):
         self.precision.setValidator(QtGui.QIntValidator(1, 4))
         self.layout.addRow("Precision", self.precision)
         self.precision.setText(str(self.config.get("precision", 2)))
-
 
         self.layout.addWidget(self.buttonBox)
 
@@ -209,8 +210,8 @@ class ControlDialog(QDialog):
             b.setAutoRepeatInterval(25)
 
         grid = QGridLayout()
-        #grid.setSpacing(2)
-        #grid.setContentsMargins(2, 2, 2, 2)
+        # grid.setSpacing(2)
+        # grid.setContentsMargins(2, 2, 2, 2)
 
         grid.addWidget(btn_up, 0, 1)
         grid.addWidget(btn_left, 1, 0)
@@ -231,8 +232,46 @@ class ControlDialog(QDialog):
         layout.addWidget(close)
 
         self.setLayout(layout)
+
     # on ok clicked
     def closeEvent(self, a):
         super().closeEvent(a)
         self.accepting()
 
+
+class NameListDialog(QDialog):
+    def __init__(self, names, selecting=None, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout()
+        self.list = QTreeWidget()
+        self.list.setColumnCount(2)
+        self.list.setSortingEnabled(True)
+
+        for n, g in names:
+            tw = QTreeWidgetItem()
+            tw.setText(0, str(n))
+            tw.setText(1, str(g))
+            self.list.addTopLevelItem(tw)
+        self.list.header().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.list.headerItem().setText(0, "Name")
+        self.list.headerItem().setText(1, "Group")
+        if selecting is not None:
+            for i in range(self.list.topLevelItemCount()):
+                item = self.list.topLevelItem(i)
+                if item.text(0) == selecting:
+                    self.list.setCurrentItem(item)
+        else:
+            self.list.setCurrentIndex(0)
+
+        dialog_ok_cancel_btn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        self.buttonBox = QDialogButtonBox(dialog_ok_cancel_btn)
+        self.buttonBox.accepted.connect(self.accept)  # type: ignore
+        self.buttonBox.rejected.connect(self.reject)  # type: ignore
+        layout.addWidget(self.list)
+        layout.addWidget(self.buttonBox)
+        self.setMinimumWidth(450)
+        self.setLayout(layout)
+
+
+    def get_selected(self):
+        return self.list.currentItem().text(0)

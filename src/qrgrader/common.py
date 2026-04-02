@@ -131,6 +131,16 @@ class StudentsData:
             return []
         return self.data["NIA"].tolist()
 
+    def get_all_names(self):
+        if self.data is None:
+            return []
+        return self.data["NAME"].tolist()
+
+    def get_all_groups(self):
+        if self.data is None:
+            return []
+        return self.data["GROUP"].tolist()
+
 
 class Nia:
 

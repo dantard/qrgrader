@@ -65,6 +65,8 @@ class CodeSet:
     def get(self, code):
         return self.codes.get(code.data)
 
+    def get_code_by_data(self, data):
+        return self.codes.get(data)
     def get_exams(self):
         return sorted(list(set([x.exam for x in self.codes.values()])))
 

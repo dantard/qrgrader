@@ -7,14 +7,16 @@ from random import shuffle
 
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
 from PyQt5.QtGui import QPen, QKeySequence
-from PyQt5.QtWidgets import QApplication, QInputDialog, QShortcut, QProgressDialog, QMessageBox, QPushButton, QMenu
-from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, QSplitter, QGraphicsRectItem, QTabWidget, QLabel, QVBoxLayout, \
+from PyQt5.QtWidgets import QApplication, QInputDialog, QShortcut, QProgressDialog, QMessageBox, QPushButton, QMenu, \
+    QComboBox
+from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, QSplitter, QGraphicsRectItem, \
+    QTabWidget, QLabel, QVBoxLayout, \
     QSizePolicy, QFormLayout, QCheckBox, QGroupBox
 from easyconfig2.easyconfig import EasyConfig2
 from numpy.ma.core import maximum
 from swikv4.pages.swik_page import SwikPage
 
-from qrgrader.dialogs import ControlDialog
+from qrgrader.dialogs import ControlDialog, NameListDialog
 from swikv4.widgets.swik_basic_widget import SwikBasicWidget
 
 from qrgrader.filter_dialog import FilterDialog
@@ -43,6 +45,7 @@ class Mark(QGraphicsRectItem):
     def mouseDoubleClickEvent(self, event):
         self.signal.double_click.emit(self.code)
 
+
 class EditableLabel(QLabel):
     new_value = pyqtSignal(int)
 
@@ -51,10 +54,23 @@ class EditableLabel(QLabel):
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
-        a, b = QInputDialog.getInt(self, "Edit Value", "Enter new value:", int(self.text().replace("X","0").replace("Y","0")))
+        a, b = QInputDialog.getInt(self, "Edit Value", "Enter new value:",
+                                   int(self.text().replace("X", "0").replace("Y", "0")))
         if b:
             self.setText(str(a))
             self.new_value.emit(a)
+
+
+class DoubleClickableLabel(QLabel):
+    double_click = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        self.double_click.emit()
+
 
 class MainWindow(QMainWindow):
     def __init__(self, schema_filenames, randomize):
@@ -71,7 +87,7 @@ class MainWindow(QMainWindow):
         self.current_exam = None
         self.detected = CodeSet()
         self.type_a = None
-        self.type_n = None
+        self.type_n: CodeSet = None
         self.changed = CodeSet()
 
         # Rubrics
@@ -102,9 +118,11 @@ class MainWindow(QMainWindow):
         self.splitter = QSplitter()
 
         # Prepare Details layout
-        self.name_lbl = QLabel()
+        self.name_lbl = DoubleClickableLabel()
         self.name_lbl.setMinimumWidth(300)
         self.name_lbl.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.name_lbl.double_click.connect(self.name_double_clicked)
+
 
         self.nia_lbl = EditableLabel()
         self.nia_lbl.new_value.connect(self.change_nia)
@@ -163,7 +181,6 @@ class MainWindow(QMainWindow):
         self.shortcut.activated.connect(self.find_people)
         self.show()
 
-
         files = os.listdir(self.dir_publish)
         files = [f for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()]
 
@@ -192,7 +209,7 @@ class MainWindow(QMainWindow):
 
                 # Update scores
                 score = self.get_full_score(exam_id)
-                item.setText(3, str(round(score,2)))
+                item.setText(3, str(round(score, 2)))
 
                 # Check if multiple marks or bad NIA
                 nia = self.xls_nia.get_nia(exam_id)
@@ -217,25 +234,40 @@ class MainWindow(QMainWindow):
             progress.hide()
 
             # add shortcut to find people
+
         QTimer.singleShot(100, delayed)
+
+    def name_label_changed(self, name):
+        nia = str(self.xls_data.get_nia_from_name(name))
+        codes = self.type_n.select(exam=self.current_exam % 1000)
+        for code in codes:
+            code.marked = False
+        for i, char in enumerate(nia):
+            code = "N" + str(self.current_exam) + f"{i}{char}"
+            code = self.type_n.get_code_by_data(code)
+            code.marked = True
+        self.detected.save(self.dir_data + self.prefix + "detected.csv")
+        self.xls_nia.set_nia(self.current_exam, nia)
+        self.process_exam()
+        self.update_labels()
 
     def contextMenuEvent(self, event):
         pos = self.swik.view.mapFrom(self, event.pos())
-        item = self.swik.view.get_item_at_position(pos,SwikPage)
+        item = self.swik.view.get_item_at_position(pos, SwikPage)
         if item is not None:
             menu = QMenu(self)
             move_action = menu.addAction("Move Codes")
             action = menu.exec_(self.mapToGlobal(event.pos()))
             if action == move_action:
-                dialog = ControlDialog(item.index, lambda: self.detected.save(self.dir_data + self.prefix + "detected.csv"),
-                                        lambda: self.move_codes(item.index,0, -2),
-                                        lambda: self.move_codes(item.index,0, 2),
-                                        lambda: self.move_codes(item.index,  -2, 0),
-                                        lambda: self.move_codes(item.index,2, 0),
-                                        lambda: self.move_codes(item.index,0, 0, 1.01),
-                                        lambda: self.move_codes(item.index,0, 0, 0.99), self)
+                dialog = ControlDialog(item.index,
+                                       lambda: self.detected.save(self.dir_data + self.prefix + "detected.csv"),
+                                       lambda: self.move_codes(item.index, 0, -2),
+                                       lambda: self.move_codes(item.index, 0, 2),
+                                       lambda: self.move_codes(item.index, -2, 0),
+                                       lambda: self.move_codes(item.index, 2, 0),
+                                       lambda: self.move_codes(item.index, 0, 0, 1.01),
+                                       lambda: self.move_codes(item.index, 0, 0, 0.99), self)
                 dialog.show()
-
 
     def rubric_tab_changed(self, index):
         rubric = self.rubrics_tabs.currentWidget()
@@ -273,7 +305,8 @@ class MainWindow(QMainWindow):
                 item = self.pdf_tree.topLevelItem(index)
                 if rubric.assessed(int(item.text(1))):
                     count += 1
-            self.number_assesed_lbl.setText(f"Done: {count}/{self.pdf_tree.topLevelItemCount()} ({count * 100 / self.pdf_tree.topLevelItemCount():.2f}%)")
+            self.number_assesed_lbl.setText(
+                f"Done: {count}/{self.pdf_tree.topLevelItemCount()} ({count * 100 / self.pdf_tree.topLevelItemCount():.2f}%)")
 
     def show(self):
         x, y, w, h, fullscreen = self.cfg_geometry.get()
@@ -282,7 +315,6 @@ class MainWindow(QMainWindow):
         else:
             self.setGeometry(x, y, w, h)
         super().show()
-
 
     def change_nia(self, nia):
         self.xls_nia.set_nia(self.current_exam, nia)
@@ -330,7 +362,6 @@ class MainWindow(QMainWindow):
         self.type_p = self.detected.select(type=Code.TYPE_P)
         self.type_q = self.detected.select(type=Code.TYPE_Q)
 
-
     def load_tables(self):
 
         if not self.xls_questions.load():
@@ -345,7 +376,13 @@ class MainWindow(QMainWindow):
             print("WARNING: data.csv file not present")
         else:
             self.xls_nia.set_valid_nias(self.xls_data.get_all_nias())
+    def name_double_clicked(self):
+        names = self.xls_data.get_all_names()
+        group = self.xls_data.get_all_groups()
 
+        dialog = NameListDialog(zip(names,group), selecting=self.name_lbl.text())
+        if dialog.exec():
+            self.name_label_changed(dialog.get_selected())
     def rubric_filtered(self):
         for index in range(self.pdf_tree.topLevelItemCount()):
             item = self.pdf_tree.topLevelItem(index)
@@ -358,7 +395,8 @@ class MainWindow(QMainWindow):
     def load_schemas(self):
         for filename in self.rubrics_files:
             name = os.path.basename(filename).replace(".scm", "")
-            r1 = Rubric(filename, self.dir_xls, buttons_height=self.cfg_buttons_height.get(), buttons_font=self.cfg_buttons_font.get())
+            r1 = Rubric(filename, self.dir_xls, buttons_height=self.cfg_buttons_height.get(),
+                        buttons_font=self.cfg_buttons_font.get())
             r1.score_changed.connect(self.rubric_score_changed)
             r1.button_or_value_changed.connect(self.rubric_button_or_value_changed)
             r1.goto_next.connect(self.goto_next)
@@ -394,15 +432,17 @@ class MainWindow(QMainWindow):
 
     def rubric_button_or_value_changed(self):
         # dialog with progress bar no advancement
-        progress = QProgressDialog("Processing...","",0, 0)
+        progress = QProgressDialog("Processing...", "", 0, 0)
         progress.setWindowModality(Qt.WindowModal)
         progress.setCancelButton(None)
         progress.setWindowTitle("QRGrader")
         progress.show()
+
         def delayed():
             self.update_all_pdf_tree_scores()
             self.update_scores_layout()
             progress.hide()
+
         QTimer.singleShot(100, delayed)
 
     def update_scores_layout(self):
@@ -410,7 +450,8 @@ class MainWindow(QMainWindow):
         total = 0
         quiz_score, full_score = self.get_quiz_score(self.current_exam)
         if full_score != 0:
-            self.quiz_score_lbl.setText("<b>" + str(quiz_score) + "</b>/" + str(round(full_score,1)) + " (" + str(round(10*quiz_score / full_score, 2)) + "/10)")
+            self.quiz_score_lbl.setText("<b>" + str(quiz_score) + "</b>/" + str(round(full_score, 1)) + " (" + str(
+                round(10 * quiz_score / full_score, 2)) + "/10)")
         else:
             self.quiz_score_lbl.setText("<b>0</b>")
 
@@ -419,11 +460,12 @@ class MainWindow(QMainWindow):
 
         for index, r in enumerate(self.rubrics):
             value, full_value = r.compute_score(self.current_exam)
-            self.rubrics_labels[index].setText("<b>" + str(value) + "</b>/" + str(full_value) + " (" + str(round(10*value / full_value, 2)) + "/10)")
+            self.rubrics_labels[index].setText(
+                "<b>" + str(value) + "</b>/" + str(full_value) + " (" + str(round(10 * value / full_value, 2)) + "/10)")
             if self.rubrics_cb[index].isChecked():
                 total += value
 
-        self.total_score_lbl.setText("<b>" + str(round(total,2)) + "</b>")
+        self.total_score_lbl.setText("<b>" + str(round(total, 2)) + "</b>")
         return total
 
     def pdf_tree_selection_changed(self, current, previous):
@@ -442,18 +484,18 @@ class MainWindow(QMainWindow):
         rubric = self.rubrics_tabs.currentWidget()
         index = rubric.get_page() if rubric is not None else 0
 
-
-
         self.swik.open(f"{self.dir_publish}{self.current_exam}.pdf", ratio=ratio, index=index)
 
-    def load_finished(self):
-
-        self.process_exam()
-
+    def update_labels(self):
         nia = self.xls_nia.get_nia(self.current_exam)
         self.nia_lbl.setText(str(nia))
         self.name_lbl.setText(str(self.xls_data.get_name(nia)))
         self.group_lbl.setText(str(self.xls_data.get_group(nia)))
+
+    def load_finished(self):
+
+        self.process_exam()
+        self.update_labels()
 
         for rubric in self.rubrics:
             rubric.pull(self.current_exam)
@@ -461,10 +503,9 @@ class MainWindow(QMainWindow):
         self.update_scores_layout()
         self.pdf_tree.set_enabled(True)
 
-
     def populate_pdf_tree(self, randomize=True):
         files = os.listdir(self.dir_publish)
-        #shuffle files
+        # shuffle files
 
         files = sorted([f.replace(".pdf", "") for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()])
         shuffle(files)
@@ -491,7 +532,7 @@ class MainWindow(QMainWindow):
 
         for index in range(self.swik.renderer.get_document_length()):
             page_codes_type_a = self.type_a.select(exam=exam_id, pdf_page=index + 1)
-            #type_a = page_codes.select(type=Code.TYPE_A)
+            # type_a = page_codes.select(type=Code.TYPE_A)
             for code in page_codes_type_a:
                 r = Mark(code)
                 r.signal.double_click.connect(self.code_clicked)
@@ -522,7 +563,7 @@ class MainWindow(QMainWindow):
                 rubric_value, _ = r.compute_score(exam_id)
                 total += rubric_value
         if self.quiz_cb.isChecked():
-            quiz_score,quiz_full_value = self.get_quiz_score(exam_id)
+            quiz_score, quiz_full_value = self.get_quiz_score(exam_id)
             total += quiz_score
 
         return total
@@ -531,14 +572,14 @@ class MainWindow(QMainWindow):
         for index in range(self.pdf_tree.topLevelItemCount()):
             item = self.pdf_tree.topLevelItem(index)
             score = self.get_full_score(int(item.text(1)))
-            item.setText(3, str(round(score,2)))
+            item.setText(3, str(round(score, 2)))
 
     def update_pdf_tree_score(self):
         for index in range(self.pdf_tree.topLevelItemCount()):
             item = self.pdf_tree.topLevelItem(index)
             if int(item.text(1)) == self.current_exam:
                 score = self.get_full_score(self.current_exam)
-                item.setText(3, str(round(score,2)))
+                item.setText(3, str(round(score, 2)))
                 break
 
     def get_quiz_score(self, exam_id):
@@ -551,7 +592,7 @@ class MainWindow(QMainWindow):
             if code.marked:
                 score += value
         score = max(score, 0)  # Ensure score is not negative
-        score = round(score, 4) # Round to 4 decimal places
+        score = round(score, 4)  # Round to 4 decimal places
         return score, full_value
 
     def get_multiple_marks(self, exam_id):
@@ -573,7 +614,6 @@ class MainWindow(QMainWindow):
         type_q = self.type_q.select(exam=exam_id, marked=1)
         return len(type_p) != len(type_q)
 
-
     def code_clicked(self, code):
         self.changed.append(code)
         self.changed.save(self.dir_data + self.prefix + "changed.csv")
@@ -594,8 +634,8 @@ class MainWindow(QMainWindow):
             item.setText(2, "")
 
     def move_codes(self, page, x, y, scale=1):
-        page_codes_type_a = self.type_a.select(exam=self.current_exam%1000, pdf_page=page + 1)
-        page_codes_type_n = self.type_n.select(exam=self.current_exam%1000, pdf_page=page + 1)
+        page_codes_type_a = self.type_a.select(exam=self.current_exam % 1000, pdf_page=page + 1)
+        page_codes_type_n = self.type_n.select(exam=self.current_exam % 1000, pdf_page=page + 1)
         a_plus_n = page_codes_type_n + page_codes_type_a
 
         if len(a_plus_n) == 0:
@@ -608,7 +648,7 @@ class MainWindow(QMainWindow):
                 selected = code
                 most_left = code.x
 
-        if scale!=1 and selected is not None:
+        if scale != 1 and selected is not None:
             # the selected code maintain its position and the others are scaled around it
             x = selected.x * (1 - scale)
             y = selected.y * (1 - scale)
@@ -618,7 +658,6 @@ class MainWindow(QMainWindow):
             code.y = code.y * scale + y
 
         self.process_exam()
-
 
 
 def main():
