@@ -23,7 +23,7 @@ from qrgrader.filter_dialog import FilterDialog
 from qrgrader.utils import makedir
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet
-from qrgrader.common import check_workspace, get_workspace_paths, Questions, Nia, StudentsData, get_prefix
+from qrgrader.common import check_workspace, get_workspace_paths, Questions, Nia, StudentsData, get_prefix, Nia2
 from qrgrader.pdf_tree import PDFTree, NumericTreeWidgetItem
 from qrgrader.rubric import Rubric
 
@@ -106,8 +106,8 @@ class MainWindow(QMainWindow):
         self.prefix = get_prefix()
         self.xls_questions = Questions(self.dir_xls + self.prefix + "questions.csv")
         self.xls_data = StudentsData(self.dir_xls + self.prefix + "data.csv")
-        #self.xls_nia = Nia(self.dir_xls + self.prefix + "nia.csv")
-        self.xls_nia = Nia(self.dir_xls + self.prefix + "nia.csv")
+        self.xls_nia_viejo = Nia(self.dir_xls + self.prefix + "nia.csv")
+        self.xls_nia = Nia2(self.type_n)
 
         self.central_widget = QWidget()
         self.main_layout = QVBoxLayout()
@@ -196,8 +196,8 @@ class MainWindow(QMainWindow):
 
         def delayed():
             # Show the progress bar
-            self.load_tables()
             self.load_detected()
+            self.load_tables()
             self.load_schemas()
             progress.setValue(10)
 
@@ -246,7 +246,8 @@ class MainWindow(QMainWindow):
             code = self.type_n.get_code_by_data(code)
             code.marked = True
         self.detected.save(self.dir_data + self.prefix + "detected.csv")
-        self.xls_nia.set_nia(self.current_exam, nia)
+        # self.xls_nia.set_nia(self.current_exam, nia)
+        self.xls_nia.update_exam(self.current_exam)
         self.process_exam()
         self.update_labels()
 
@@ -373,7 +374,10 @@ class MainWindow(QMainWindow):
             print("ERROR: questions.csv file not present")
             sys.exit(1)
 
-        if not self.xls_nia.load():
+        self.xls_nia_viejo.load()
+
+
+        if not self.xls_nia.load(self.type_n):
             print("ERROR: nia.csv file not present")
             sys.exit(1)
 
@@ -644,8 +648,13 @@ class MainWindow(QMainWindow):
         self.changed.save(self.dir_data + self.prefix + "changed.csv")
         code.marked = not code.marked
         self.process_exam()
-        self.update_scores_layout()
-        self.update_pdf_tree_score()
+        if code.data.startswith("N"):
+            self.xls_nia.update_exam(self.current_exam)
+            self.update_labels()
+        else:
+            self.update_scores_layout()
+            self.update_pdf_tree_score()
+
         self.detected.save(self.dir_data + self.prefix + "detected.csv")
 
         item = self.pdf_tree.currentItem()

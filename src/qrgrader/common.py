@@ -1,6 +1,8 @@
 import os
+import sys
 
 import pandas
+from pandas import DataFrame
 
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet
@@ -163,18 +165,38 @@ class Password:
             return None
         return by_exam.iloc[0]["PASSWORD"]
 
+
 class Nia2:
 
     def __init__(self, type_n):
         self.valid_nias = []
         self.codes = type_n
+        self.all_nia = []
         self.nia = None
 
-    def load(self):
-        exams = set()
-        for code in self.codes:
-            exams.add(code[:11])
-        print(exams)
+    def load(self, type_n):
+        self.codes = type_n
+        exams = list(set(int(code.data[1:10]) for code in self.codes))
+        nias = []
+        for exam in exams:
+            codes = sorted(
+                code.data
+                for code in type_n.select(exam=exam % 1000)
+                if code.marked
+            )
+            nia = int("".join([c[-1] for c in codes])) if len(codes) > 0 else 0
+            nias.append(nia)
+        self.nia = DataFrame({"EXAM": exams, "NIA": nias})
+        return True
+
+    def update_exam(self, exam_id):
+        codes = sorted(
+            code.data
+            for code in self.codes.select(exam=exam_id % 1000)
+            if code.marked
+        )
+        nia = int("".join([c[-1] for c in codes])) if len(codes) > 0 else 0
+        self.nia.loc[self.nia['EXAM'] == int(exam_id), 'NIA'] = int(nia)
 
     def get_nia(self, exam):
         # EXAM FORMAT: 240509002
@@ -211,6 +233,8 @@ class Nia2:
             return False
         self.nia.to_csv(self.filename, sep='\t', index=False)
         return True
+
+
 class Nia:
 
     def __init__(self, filename):
