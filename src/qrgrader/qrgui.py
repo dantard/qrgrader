@@ -1,9 +1,8 @@
 import argparse
 import os
 import sys
-import random
 import signal
-from datetime import time
+
 from random import shuffle
 
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
@@ -14,7 +13,6 @@ from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, 
     QTabWidget, QLabel, QVBoxLayout, \
     QSizePolicy, QFormLayout, QCheckBox, QGroupBox
 from easyconfig2.easyconfig import EasyConfig2
-from numpy.ma.core import maximum
 from swikv4.pages.swik_page import SwikPage
 
 from qrgrader.dialogs import ControlDialog, NameListDialog
@@ -196,7 +194,6 @@ class MainWindow(QMainWindow):
         progress.show()
 
         def delayed():
-            begin = time()
             # Show the progress bar
             self.load_detected()
             self.load_tables()
@@ -354,7 +351,6 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "Not Found", "No exam found for NIA or Name: " + text)
 
     def closeEvent(self, a0):
-        print("SAVVVVVON")
         current = self.pdf_tree.currentItem()
         if current is not None:
             for rubric in self.rubrics:
