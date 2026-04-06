@@ -48,10 +48,6 @@ def main():
     dir_workspace, dir_data, _, dir_generated, dir_xls, _, dir_source = get_workspace_paths(os.getcwd())
     date = get_date()
 
-    if not check_workspace():
-        print("ERROR: qrsheets must be run from a workspace directory")
-        sys.exit(1)
-
     # Create json file with client secrets
     makedir("config")
     if not os.path.exists("config" + os.sep + "client_secret.json"):

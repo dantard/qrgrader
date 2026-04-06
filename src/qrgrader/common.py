@@ -296,7 +296,7 @@ class Nia3:
         if self.nia is None:
             return False
         with open(filename, "w", encoding='utf-8') as f:
-            f.write("EXAM\tNIA\n")
+            f.write("EXAM ID\tNIA\n")
             for k, v in self.nia.items():
                 f.write(str(k) + "\t" + str(v) + "\n")
         return True

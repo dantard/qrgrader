@@ -339,8 +339,8 @@ def main():
         print(f">> Creating {os.path.basename(table_filename)} file")
         type_n = codes.select(type=Code.TYPE_N)
         # print(type_n)
-#       # nia = Nia(dir_xls + prefix + "nia.csv")
-#       # nia.load()
+        # nia = Nia(dir_xls + prefix + "nia.csv")
+        # nia.load()
         nia = Nia3(type_n)
         nia.load()
 

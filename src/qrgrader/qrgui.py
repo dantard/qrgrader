@@ -199,15 +199,11 @@ class MainWindow(QMainWindow):
             begin = time()
             # Show the progress bar
             self.load_detected()
-            print("Loaded detected codes in", time() - begin, "seconds")
             self.load_tables()
-            print("Loaded tables in", time() - begin, "seconds")
             self.load_schemas()
-            print("Loaded schemas in", time() - begin, "seconds")
             progress.setValue(10)
 
             self.populate_pdf_tree(self.randomize)
-            print("Populated PDF tree in", time() - begin, "seconds")
             self.pdf_tree.currentItemChanged.connect(self.pdf_tree_selection_changed)
 
             if self.pdf_tree.topLevelItemCount() > 0:
@@ -358,6 +354,12 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "Not Found", "No exam found for NIA or Name: " + text)
 
     def closeEvent(self, a0):
+        print("SAVVVVVON")
+        current = self.pdf_tree.currentItem()
+        if current is not None:
+            for rubric in self.rubrics:
+                rubric.push(int(current.text(1)))
+
         self.cfg_geometry.set(
             [self.geometry().x(), self.geometry().y(), self.geometry().width(), self.geometry().height(),
              self.isFullScreen()])
