@@ -17,7 +17,7 @@ from pymupdf.mupdf import PDF_ENCRYPT_KEEP
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet, PageCodeSet
 from qrgrader.common import check_workspace, get_workspace_paths, get_temp_paths, Generated, Questions, get_date, Nia, \
-    StudentsData
+    StudentsData, Nia3
 from qrgrader.page_processor import PageProcessor
 from qrgrader.utils import makedir
 from datetime import timedelta
@@ -254,7 +254,8 @@ def main():
             codes.extend(detected)
             codes.save(dir_data + prefix + "detected.csv")
 
-    if args.get("reconstruct") or args.get("nia") or args.get("raw") or args.get("annotate") or args.get("encrypt"):
+    if args.get("reconstruct") or args.get("nia") or args.get("raw") \
+            or args.get("annotate") or args.get("encrypt") or args.get("table"):
         codes = CodeSet()
         if not codes.load(dir_data + prefix + "detected.csv"):
             print(f"ERROR: file {os.path.basename(dir_data + prefix + 'detected.csv')} not found")
@@ -280,20 +281,23 @@ def main():
     if args.get("nia"):
         nia_filename = dir_xls + prefix + "nia.csv"
         print(f">> Creating {os.path.basename(nia_filename)} file")
-        type_n = codes.select(type=Code.TYPE_N)
-        with open(nia_filename, "w", encoding='utf-8') as f:
-            f.write("EXAM\tNIA\n")
-            for exam in exams:
-                nia = {0: 'Y', 1: 'Y', 2: 'Y', 3: 'Y', 4: 'Y', 5: 'Y'}
-                exam_codes = type_n.select(exam=exam)
-                for row in range(6):
-                    for number in range(10):
-                        result = exam_codes.first(number=row * 10 + number)
-                        if result is None or result.marked:
-                            nia[row] = number if nia[row] == 'Y' else 'X'
-                nia = "".join([str(x) for x in nia.values()])
+        nia = Nia3(codes.select(type=Code.TYPE_N))
+        nia.load()
+        nia.save(nia_filename)
 
-                f.write("{}\t{}\n".format(date * 1000 + exam, nia))
+        # with open(nia_filename, "w", encoding='utf-8') as f:
+        #    f.write("EXAM\tNIA\n")
+        #    for exam in exams:
+        #        nia = {0: 'Y', 1: 'Y', 2: 'Y', 3: 'Y', 4: 'Y', 5: 'Y'}
+        #        exam_codes = type_n.select(exam=exam)
+        #        for row in range(6):
+        #            for number in range(10):
+        #                result = exam_codes.first(number=row * 10 + number)
+        #                if result is None or result.marked:
+        #                    nia[row] = number if nia[row] == 'Y' else 'X'
+        #        nia = "".join([str(x) for x in nia.values()])
+        #
+        #        f.write("{}\t{}\n".format(date * 1000 + exam, nia))
 
     if args.get("raw"):
         raw_filename = dir_xls + prefix + "raw.csv"
@@ -333,8 +337,11 @@ def main():
     if args.get("table"):
         table_filename = dir_xls + prefix + "table.csv"
         print(f">> Creating {os.path.basename(table_filename)} file")
-
-        nia = Nia(dir_xls + prefix + "nia.csv")
+        type_n = codes.select(type=Code.TYPE_N)
+        # print(type_n)
+#       # nia = Nia(dir_xls + prefix + "nia.csv")
+#       # nia.load()
+        nia = Nia3(type_n)
         nia.load()
 
         students_data = StudentsData(dir_xls + os.sep + "data.csv")

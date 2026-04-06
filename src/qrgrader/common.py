@@ -235,6 +235,73 @@ class Nia2:
         return True
 
 
+class Nia3:
+
+    def __init__(self, type_n):
+        self.valid_nias = []
+        self.codes = type_n
+        self.all_nia = []
+        self.nia = {}
+
+    def load(self, type_n=None):
+        if type_n is not None:
+            self.codes = type_n
+        exams = list(set(int(code.data[1:10]) for code in self.codes))
+        for exam in exams:
+            codes = sorted(
+                code.data
+                for code in self.codes.select(exam=exam % 1000)
+                if code.marked
+            )
+            nia = int("".join([c[-1] for c in codes])) if len(codes) > 0 else 0
+            self.nia[exam] = int(nia)
+        return True
+
+    def update_exam(self, exam_id):
+        codes = sorted(
+            code.data
+            for code in self.codes.select(exam=exam_id % 1000)
+            if code.marked
+        )
+        nia = int("".join([c[-1] for c in codes])) if len(codes) > 0 else 0
+        self.nia[exam_id] = int(nia)
+
+    def get_nia(self, exam):
+        # EXAM FORMAT: 240509002
+        nia = self.nia.get(exam, None)
+        if nia is None:
+            return "?", "No exam", None
+        elif str(nia).isdigit():
+            if self.all_nia.count(nia) > 1:
+                return "D", str(nia), nia
+            elif len(self.valid_nias) > 0 and nia not in self.valid_nias:
+                return "?", str(nia), nia
+            return "", str(nia), int(nia)
+        return "#", str(nia), None
+
+    def get_exam(self, nia):
+        for k, v in self.nia.items():
+            if v == nia:
+                return k
+        return None
+
+    def set_nia(self, exam_id, nia):
+        # EXAM FORMAT: 240509002
+        self.nia[int(exam_id)] = int(nia)
+
+    def set_valid_nias(self, nias):
+        self.valid_nias = nias
+
+    def save(self, filename):
+        if self.nia is None:
+            return False
+        with open(filename, "w", encoding='utf-8') as f:
+            f.write("EXAM\tNIA\n")
+            for k, v in self.nia.items():
+                f.write(str(k) + "\t" + str(v) + "\n")
+        return True
+
+
 class Nia:
 
     def __init__(self, filename):

@@ -5,7 +5,9 @@ import sys
 
 import yaml
 
-from qrgrader.common import check_workspace, Nia, get_workspace_paths, get_date, Password
+from qrgrader.code import Code
+from qrgrader.code_set import CodeSet
+from qrgrader.common import check_workspace, Nia, get_workspace_paths, get_date, Password, Nia3, get_prefix
 from qrgrader.encrypt import decrypt
 from qrgrader.secret import get_secret
 from qrgrader.utils import makedir
@@ -100,9 +102,16 @@ def main():
             args["list"] = folder_id
 
         if args.get("list", None):
+            codes = CodeSet()
+            if not codes.load(dir_data + get_prefix() + "detected.csv"):
+                print(f"ERROR: file {os.path.basename(dir_data + get_prefix() + 'detected.csv')} not found")
+                sys.exit(1)
 
-            nias = Nia(dir_xls + os.sep + str(date) + "_nia.csv")
-            nias.load()
+            nia = Nia3(codes.select(type=Code.TYPE_N))
+            nia.load()
+
+            # nias = Nia(dir_xls + os.sep + str(date) + "_nia.csv")
+            # nias.load()
 
             passwd = Password(dir_xls + os.sep + str(date) + "_password.csv")
             has_password = passwd.load()

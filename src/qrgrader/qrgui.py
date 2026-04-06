@@ -3,6 +3,7 @@ import os
 import sys
 import random
 import signal
+from datetime import time
 from random import shuffle
 
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
@@ -23,7 +24,7 @@ from qrgrader.filter_dialog import FilterDialog
 from qrgrader.utils import makedir
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet
-from qrgrader.common import check_workspace, get_workspace_paths, Questions, Nia, StudentsData, get_prefix, Nia2
+from qrgrader.common import check_workspace, get_workspace_paths, Questions, Nia, StudentsData, get_prefix, Nia3
 from qrgrader.pdf_tree import PDFTree, NumericTreeWidgetItem
 from qrgrader.rubric import Rubric
 
@@ -107,7 +108,7 @@ class MainWindow(QMainWindow):
         self.xls_questions = Questions(self.dir_xls + self.prefix + "questions.csv")
         self.xls_data = StudentsData(self.dir_xls + self.prefix + "data.csv")
         self.xls_nia_viejo = Nia(self.dir_xls + self.prefix + "nia.csv")
-        self.xls_nia = Nia2(self.type_n)
+        self.xls_nia = Nia3(self.type_n)
 
         self.central_widget = QWidget()
         self.main_layout = QVBoxLayout()
@@ -195,13 +196,18 @@ class MainWindow(QMainWindow):
         progress.show()
 
         def delayed():
+            begin = time()
             # Show the progress bar
             self.load_detected()
+            print("Loaded detected codes in", time() - begin, "seconds")
             self.load_tables()
+            print("Loaded tables in", time() - begin, "seconds")
             self.load_schemas()
+            print("Loaded schemas in", time() - begin, "seconds")
             progress.setValue(10)
 
             self.populate_pdf_tree(self.randomize)
+            print("Populated PDF tree in", time() - begin, "seconds")
             self.pdf_tree.currentItemChanged.connect(self.pdf_tree_selection_changed)
 
             if self.pdf_tree.topLevelItemCount() > 0:
