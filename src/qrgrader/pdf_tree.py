@@ -41,7 +41,7 @@ class PDFTree(QTreeWidget):
 
     def sort(self, index, order):
         if index > 0:
-            self.renumber()
+            QTimer.singleShot(0, self.renumber)
 
     def renumber(self):
         j = 1

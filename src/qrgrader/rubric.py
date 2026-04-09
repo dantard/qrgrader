@@ -51,33 +51,35 @@ class Rubric(QListWidget):
         self.customContextMenuRequested.connect(self.button_list_right_click)
 
         self.filter_btn = QPushButton("Apply Filter")
-        self.filter_btn.setFlat(True)
+        #self.filter_btn.setFlat(True)
         self.filter_btn.setCheckable(True)
         self.filter_btn.setStyleSheet("background-color: #F0A0A0")
         self.filter_btn.clicked.connect(self.toggle_filter)
 
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(5, 5, 5, 0)  # margins you want
-        layout.addWidget(self.filter_btn)
-        item = QListWidgetItem()
-        self.addItem(item)
-        item.setSizeHint(container.sizeHint())
-        self.setItemWidget(item, container)
+        # container = QWidget()
+        # layout = QVBoxLayout(container)
+        # layout.setContentsMargins(5, 5, 5, 0)  # margins you want
+        # layout.addWidget(self.filter_btn)
+        # item = QListWidgetItem()
+        # self.addItem(item)
+        # item.setSizeHint(container.sizeHint())
+        # self.setItemWidget(item, container)
 
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        item = QListWidgetItem()
-        item.setFlags(Qt.NoItemFlags)  # optional: makes it non-selectable
-        item.setSizeHint(line.sizeHint())
-        self.addItem(item)
-        self.setItemWidget(item, line)
+        # line = QFrame()
+        # line.setFrameShape(QFrame.HLine)
+        # line.setFrameShadow(QFrame.Sunken)
+        # item = QListWidgetItem()
+        # item.setFlags(Qt.NoItemFlags)  # optional: makes it non-selectable
+        # item.setSizeHint(line.sizeHint())
+        # self.addItem(item)
+        # self.setItemWidget(item, line)
 
 
         self.populate()
         self.load_scores()
 
+    def get_filter_button(self):
+        return self.filter_btn
 
     def toggle_filter(self):
         if not self.filter_btn.isChecked():

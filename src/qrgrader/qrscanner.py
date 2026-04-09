@@ -17,7 +17,7 @@ from pymupdf.mupdf import PDF_ENCRYPT_KEEP
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet, PageCodeSet
 from qrgrader.common import check_workspace, get_workspace_paths, get_temp_paths, Generated, Questions, get_date, Nia, \
-    StudentsData, Nia3
+    StudentsData, Nia
 from qrgrader.page_processor import PageProcessor
 from qrgrader.utils import makedir
 from datetime import timedelta
@@ -281,7 +281,7 @@ def main():
     if args.get("nia"):
         nia_filename = dir_xls + prefix + "nia.csv"
         print(f">> Creating {os.path.basename(nia_filename)} file")
-        nia = Nia3(codes.select(type=Code.TYPE_N))
+        nia = Nia(codes.select(type=Code.TYPE_N))
         nia.load()
         nia.save(nia_filename)
 
@@ -341,7 +341,7 @@ def main():
         # print(type_n)
         # nia = Nia(dir_xls + prefix + "nia.csv")
         # nia.load()
-        nia = Nia3(type_n)
+        nia = Nia(type_n)
         nia.load()
 
         students_data = StudentsData(dir_xls + os.sep + "data.csv")

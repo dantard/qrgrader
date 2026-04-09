@@ -22,7 +22,7 @@ from qrgrader.filter_dialog import FilterDialog
 from qrgrader.utils import makedir
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet
-from qrgrader.common import check_workspace, get_workspace_paths, Questions, Nia, StudentsData, get_prefix, Nia3
+from qrgrader.common import check_workspace, get_workspace_paths, Questions, StudentsData, get_prefix, Nia
 from qrgrader.pdf_tree import PDFTree, NumericTreeWidgetItem
 from qrgrader.rubric import Rubric
 
@@ -105,8 +105,7 @@ class MainWindow(QMainWindow):
         self.prefix = get_prefix()
         self.xls_questions = Questions(self.dir_xls + self.prefix + "questions.csv")
         self.xls_data = StudentsData(self.dir_xls + self.prefix + "data.csv")
-        self.xls_nia_viejo = Nia(self.dir_xls + self.prefix + "nia.csv")
-        self.xls_nia = Nia3(self.type_n)
+        self.xls_nia = Nia(self.type_n)
 
         self.central_widget = QWidget()
         self.main_layout = QVBoxLayout()
@@ -276,11 +275,11 @@ class MainWindow(QMainWindow):
                 dialog.show()
 
     def rubric_tab_changed(self, index):
-        rubric = self.rubrics_tabs.currentWidget()
+        rubric = self.get_current_rubric()
         if rubric is not None:
             index = rubric.get_page()
             try:
-                self.swik.view.move_to_page(index)
+                self.swik.view.move_to_page(index, 10)
             except Exception as e:
                 pass
 
@@ -302,8 +301,11 @@ class MainWindow(QMainWindow):
         if item.text(2) not in ["!", "@", "?", "D"]:
             item.setText(2, symb)
 
+    def get_current_rubric(self):
+        return self.rubrics[self.rubrics_tabs.currentIndex()] if self.rubrics_tabs.currentIndex() >= 0 else None
+
     def update_number_assessed(self):
-        rubric = self.rubrics_tabs.currentWidget()
+        rubric = self.get_current_rubric()
 
         if rubric is not None:
             count = 0
@@ -378,9 +380,6 @@ class MainWindow(QMainWindow):
             print("ERROR: questions.csv file not present")
             sys.exit(1)
 
-        self.xls_nia_viejo.load()
-
-
         if not self.xls_nia.load(self.type_n):
             print("ERROR: nia.csv file not present")
             sys.exit(1)
@@ -404,6 +403,7 @@ class MainWindow(QMainWindow):
             for rubric in self.rubrics:
                 comply = comply and rubric.comply_with_filter(exam_id)
                 item.setHidden(not comply)
+        self.pdf_tree.renumber()
 
     def load_schemas(self):
         for filename in self.rubrics_files:
@@ -416,7 +416,13 @@ class MainWindow(QMainWindow):
             r1.filtered.connect(self.rubric_filtered)
             r1.lock(self.locked)
 
-            self.rubrics_tabs.addTab(r1, name)
+            helper = QWidget()
+            helper.setLayout(QVBoxLayout())
+            #helper.setContentsMargins(0, 0, 0, 0)
+            #helper.layout().setContentsMargins(0, 0, 0, 0)
+            helper.layout().addWidget(r1.get_filter_button())
+            helper.layout().addWidget(r1)
+            self.rubrics_tabs.addTab(helper, name)
             self.rubrics.append(r1)
 
             label = QLabel("0")
@@ -483,22 +489,29 @@ class MainWindow(QMainWindow):
         return total
 
     def pdf_tree_selection_changed(self, current, previous):
-        self.pdf_tree.set_enabled(False)
-        if previous is not None:
-            if len(self.rubrics) > 0:
-                self.update_done_color(previous)
-                self.update_number_assessed()
+        self.progress_dialog = QProgressDialog("Loading exam...", None, 0, 0, self)
+        self.progress_dialog.setWindowModality(Qt.ApplicationModal)
+        self.progress_dialog.setAutoClose(False)
+        self.progress_dialog.setAutoReset(False)
+        self.progress_dialog.show()
+        def do():
+            self.pdf_tree.set_enabled(False)
+            if previous is not None:
+                if len(self.rubrics) > 0:
+                    self.update_done_color(previous)
+                    self.update_number_assessed()
 
-            for rubric in self.rubrics:
-                rubric.push(int(previous.text(1)))
+                for rubric in self.rubrics:
+                    rubric.push(int(previous.text(1)))
 
-        self.current_exam = int(current.text(1))
+            self.current_exam = int(current.text(1))
 
-        ratio = self.swik.view.get_ratio()
-        rubric = self.rubrics_tabs.currentWidget()
-        index = rubric.get_page() if rubric is not None else 0
+            ratio = self.swik.view.get_ratio()
+            rubric = self.get_current_rubric()
+            index = rubric.get_page() if rubric is not None else 0
 
-        self.swik.open(f"{self.dir_publish}{self.current_exam}.pdf", ratio=ratio, index=index)
+            self.swik.open(f"{self.dir_publish}{self.current_exam}.pdf", ratio=ratio, index=index)
+        QTimer.singleShot(50, do)
 
     def update_labels(self):
         symbol, text, nia = self.xls_nia.get_nia(self.current_exam)
@@ -507,14 +520,6 @@ class MainWindow(QMainWindow):
         self.group_lbl.setText(str(self.xls_data.get_group(nia)))
 
     def load_finished(self):
-
-        self.rubric_tab_changed(0)
-        self.process_exam()
-        self.update_labels()
-
-
-    def load_finished(self):
-
         self.process_exam()
         self.update_labels()
 
@@ -522,21 +527,25 @@ class MainWindow(QMainWindow):
             rubric.pull(self.current_exam)
 
         self.update_scores_layout()
+        self.rubric_tab_changed(0)
         self.pdf_tree.set_enabled(True)
+        self.progress_dialog.hide()
 
-    def populate_pdf_tree(self, randomize=True):
+
+    def populate_pdf_tree(self, randomize=False):
         files = os.listdir(self.dir_publish)
         # shuffle files
 
         files = sorted([f.replace(".pdf", "") for f in files if f.endswith(".pdf") and f.replace(".pdf", "").isdigit()])
-        shuffle(files)
-        for f in files:
-            item = NumericTreeWidgetItem(["", f, ""])
+        if randomize:
+            shuffle(files)
+        for i, f in enumerate(files):
+            item = NumericTreeWidgetItem([str(i+1), f, ""])
             self.pdf_tree.addTopLevelItem(item)
 
-        if not randomize:
-            self.pdf_tree.sortByColumn(1, Qt.AscendingOrder)
-        self.pdf_tree.renumber()
+        # if not randomize:
+        self.pdf_tree.sortByColumn(0, Qt.AscendingOrder)
+        # self.pdf_tree.renumber()
 
         # Not updating the scores here, as it is done somewhere else
         # self.update_all_pdf_tree_scores()
@@ -707,7 +716,7 @@ def main():
         sys.exit(1)
 
     parser = argparse.ArgumentParser(description='qrgui.py')
-    parser.add_argument('-s', '--schema', help='Schema to be used', default=[], action="append")
+    parser.add_argument('-s', '--schema', help='Schema to be used', default=[], nargs="+")
     parser.add_argument('-c', '--create', help="Create schema if doesn't exist", action="store_true")
     parser.add_argument('-r', '--random', help="Randomize exam order", action="store_true")
     parser.add_argument('-l', '--lock', help="Lock Rubrics", action="store_true")

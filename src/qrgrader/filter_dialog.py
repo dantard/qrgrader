@@ -63,7 +63,6 @@ class FilterListWidget(QListWidget):
             # Load schema
             with open(self.schema_filename, newline='') as csvfile:
                 content = yaml.full_load(csvfile)
-                print("loading schema:", self.schema_filename)
                 self.config = content.get("config", {})
                 self.schema_dictionary = content.get("buttons", {})
 

@@ -166,76 +166,7 @@ class Password:
         return by_exam.iloc[0]["PASSWORD"]
 
 
-class Nia2:
-
-    def __init__(self, type_n):
-        self.valid_nias = []
-        self.codes = type_n
-        self.all_nia = []
-        self.nia = None
-
-    def load(self, type_n):
-        self.codes = type_n
-        exams = list(set(int(code.data[1:10]) for code in self.codes))
-        nias = []
-        for exam in exams:
-            codes = sorted(
-                code.data
-                for code in type_n.select(exam=exam % 1000)
-                if code.marked
-            )
-            nia = int("".join([c[-1] for c in codes])) if len(codes) > 0 else 0
-            nias.append(nia)
-        self.nia = DataFrame({"EXAM": exams, "NIA": nias})
-        return True
-
-    def update_exam(self, exam_id):
-        codes = sorted(
-            code.data
-            for code in self.codes.select(exam=exam_id % 1000)
-            if code.marked
-        )
-        nia = int("".join([c[-1] for c in codes])) if len(codes) > 0 else 0
-        self.nia.loc[self.nia['EXAM'] == int(exam_id), 'NIA'] = int(nia)
-
-    def get_nia(self, exam):
-        # EXAM FORMAT: 240509002
-        by_exam = self.nia[self.nia["EXAM"] == int(exam)]
-        if by_exam.empty or by_exam.iloc[0]["NIA"] is None:
-            return "?", "No exam", None
-        nia = by_exam.iloc[0]["NIA"]
-        if nia is None:
-            return "?", "No NIA", None
-        elif str(nia).isdigit():
-            if self.all_nia.count(nia) > 1:
-                return "D", str(nia), nia
-            elif len(self.valid_nias) > 0 and nia not in self.valid_nias:
-                return "?", str(nia), nia
-            return "", str(nia), int(nia)
-        return "#", str(nia), None
-
-    def get_exam(self, nia):
-        by_nia = self.nia[self.nia["NIA"] == nia]
-        if by_nia.empty:
-            return None
-
-        return by_nia.iloc[0]["EXAM"]
-
-    def set_nia(self, exam_id, nia):
-        # EXAM FORMAT: 240509002
-        self.nia.loc[self.nia['EXAM'] == int(exam_id), 'NIA'] = int(nia)
-
-    def set_valid_nias(self, nias):
-        self.valid_nias = nias
-
-    def save(self):
-        if self.nia is None:
-            return False
-        self.nia.to_csv(self.filename, sep='\t', index=False)
-        return True
-
-
-class Nia3:
+class Nia:
 
     def __init__(self, type_n):
         self.valid_nias = []
@@ -302,55 +233,6 @@ class Nia3:
         return True
 
 
-class Nia:
-
-    def __init__(self, filename):
-        self.valid_nias = []
-        self.filename = filename
-        self.nia = None
-
-    def load(self):
-        if os.path.exists(self.filename):
-            self.nia = pandas.read_csv(self.filename, sep='\t', header=0)
-            self.all_nia = self.nia["NIA"].tolist()
-            return True
-        return False
-
-    def get_nia(self, exam):
-        # EXAM FORMAT: 240509002
-        by_exam = self.nia[self.nia["EXAM"] == int(exam)]
-        if by_exam.empty or by_exam.iloc[0]["NIA"] is None:
-            return "?", "No exam", None
-        nia = by_exam.iloc[0]["NIA"]
-        if nia is None:
-            return "?", "No NIA", None
-        elif str(nia).isdigit():
-            if self.all_nia.count(nia) > 1:
-                return "D", str(nia), nia
-            elif len(self.valid_nias) > 0 and nia not in self.valid_nias:
-                return "?", str(nia), nia
-            return "", str(nia), int(nia)
-        return "#", str(nia), None
-
-    def get_exam(self, nia):
-        by_nia = self.nia[self.nia["NIA"] == nia]
-        if by_nia.empty:
-            return None
-
-        return by_nia.iloc[0]["EXAM"]
-
-    def set_nia(self, exam_id, nia):
-        # EXAM FORMAT: 240509002
-        self.nia.loc[self.nia['EXAM'] == int(exam_id), 'NIA'] = int(nia)
-
-    def set_valid_nias(self, nias):
-        self.valid_nias = nias
-
-    def save(self):
-        if self.nia is None:
-            return False
-        self.nia.to_csv(self.filename, sep='\t', index=False)
-        return True
 
 
 def get_narrowest_type(cell):
