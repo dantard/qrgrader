@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='qrgrader',
-    version='0.0.23',
+    version='0.0.25',
     packages=find_packages(where='src'),  # Specify src directory
     package_dir={'': 'src'},  # Tell setuptools that packages are under src
     install_requires=[
@@ -14,7 +14,7 @@ setup(
         'pydrive2',
         'opencv-python-headless',
         'pandas',
-        'swikv4-minimal'
+        'swikv4-minimal >= 0.0.5'
     ],
     author='Danilo Tardioli',
     author_email='dantard@unizar.es',

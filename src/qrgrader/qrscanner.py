@@ -6,6 +6,9 @@ import time
 from itertools import accumulate
 from multiprocessing import Manager, Pool, Process
 from random import randint
+
+from sympy.codegen.cfunctions import isnan
+
 import qrgrader.utils as utils
 import cv2
 import pandas as pd
@@ -344,7 +347,7 @@ def main():
         nia = Nia(type_n)
         nia.load()
 
-        students_data = StudentsData(dir_xls + os.sep + "data.csv")
+        students_data = StudentsData(dir_xls + os.sep + str(ws_date) + "_data.csv")
         students_data.load()
 
         questions = Questions(dir_xls + os.sep + str(ws_date) + "_questions.csv")
@@ -353,37 +356,15 @@ def main():
         raw = pd.read_csv(dir_xls + os.sep + str(ws_date) + "_raw.csv", sep='\t', header=None)
         raw.iloc[:, 0] = raw.iloc[:, 0] * 1000 + raw.iloc[:, 1]
         raw.set_index(raw.iloc[:, 0], inplace=True)
+        raw = raw.astype(str) # to avoid problems with the formulas when the index is numeric
+
 
         hdr = 4  # Number of header rows
-        inserted = 0
-
-        # Insert the NIA column
-        raw.insert(inserted + 2, "NIA", "")
-        for exam_id in raw.iloc[:, 0].tolist():
-            symbol, text, _ = nia.get_nia(exam_id)
-            raw.loc[exam_id, "NIA"] = symbol + text
-        inserted += 1
-
-        # Insert the GRADE columns
-        raw.insert(inserted + 2, "T", '=INDIRECT(ADDRESS(ROW(), COLUMN() -2)) + INDIRECT(ADDRESS(ROW(), COLUMN() -1))')
-        raw.insert(inserted + 2, "O", '=SUMPRODUCT(($G$3:$3="O") * INDIRECT(ADDRESS(ROW(), COLUMN() + 2) & ":" '
-                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 2) & ":" '
-                                      '& ADDRESS(4, COLUMNS($A$1:$1))))')
-        raw.insert(inserted + 2, "Q", '=max(0,SUMPRODUCT(($G$3:$3<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" '
-                                      '& ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" '
-                                      '& ADDRESS(4, COLUMNS($A$1:$1)))))')
-
-        inserted += 3
 
         # Fill the header
         percent_answ = '=SUM(OFFSET(INDIRECT("RC", FALSE), 1, 0, ROWS(A:A)-ROW(), 1))/COUNT(OFFSET(INDIRECT("RC", FALSE), 1, 0, ROWS(A:A)-ROW(), 1))'
-        percent_ques = ('=SUM(OFFSET(INDIRECT("RC", FALSE), ' + str(
-            hdr) + ', -3, ROWS(A:A) - ROW()-4, 4))/COUNT(OFFSET(INDIRECT("RC", FALSE), '
-                        + str(hdr) + ', 0, ROWS(A:A)-ROW(), 1))')
-
-        names, qn, ans_letter, ans_value = [""] * (inserted + 2), [""] * (inserted + 2), [""] * (inserted + 2), [
-            ""] * (inserted + 2)
-        ans_perc = ["Exam ID", "#", "NIA", "Q", "O", "T"]
+        percent_ques = f'=SUM(OFFSET(INDIRECT("RC", FALSE), {hdr}, -3, ROWS(A:A) - ROW()-4, 4))/COUNT(OFFSET(INDIRECT("RC", FALSE), {hdr}, 0, ROWS(A:A)-ROW(), 1))'
+        names, qn, ans_letter, ans_value, ans_perc = [], [], [], [], []
 
         num_open = 0
         for question in questions.get_questions():
@@ -398,19 +379,64 @@ def main():
                 qn.append(question)
                 ans_letter.append("O")
                 ans_value.append(questions.get_value(question, 1))
-                ans_perc.append('=countif((INDIRECT(ADDRESS(6, COLUMN()) & ":" & ADDRESS(ROWS(6:1000), COLUMN()))),">0")/count((INDIRECT(ADDRESS(6, COLUMN()) & ":" & ADDRESS(ROWS(6:1000), COLUMN()))))')
+                #ans_perc.append('=countif((INDIRECT(ADDRESS(6, COLUMN()) & ":" & ADDRESS(ROWS(6:1000), COLUMN()))),">0")/count((INDIRECT(ADDRESS(6, COLUMN()) & ":" & ADDRESS(ROWS(6:1000), COLUMN()))))')
+                ans_perc.append("") # TODO:
                 num_open += 1
 
-        # print(raw.shape, len(names), len(qn), len(ans_letter), len(ans_value), len(ans_perc))
+        # insert the header rows
+        raw.loc[0, 2:] = names
+        raw.loc[1, 2:] = qn
+        raw.loc[2, 2:] = ans_letter
+        raw.loc[3, 2:] = ans_value
+        raw.loc[4, 2:] = ans_perc
 
-        raw.loc[-5] = names
-        raw.loc[-4] = qn
-        raw.loc[-3] = ans_letter
-        raw.loc[-2] = ans_value
-        raw.loc[-1] = ans_perc
-        df = raw.sort_index().reset_index(drop=True)
 
-        df.iloc[5:,-num_open:] = '=IFERROR(VLOOKUP(INDIRECT("A" & ROW()), INDIRECT("'+get_date()+'_" & INDIRECT(ADDRESS(1, COLUMN(), 4)) & "!A:D"), 2, FALSE),0)'
+
+        # sort the index and reset it to be sure that the
+        # exams are in the right order and the header is on top
+        df = raw.sort_index()
+
+
+
+        # TABLE IS READY WITH UPPER FORMULA
+
+        # Insert the formulas for the open questions
+        if num_open > 0:
+            df.iloc[5:,-num_open:] = '=IFERROR(VLOOKUP(INDIRECT("A" & ROW()), INDIRECT("'+get_date()+'_" & INDIRECT(ADDRESS(1, COLUMN(), 4)) & "!A:D"), 2, FALSE),0)'
+
+
+        # insert columns for the grade and the Q score
+        df.insert(2, "Q", "")
+        df.loc[hdr + 1:, "Q"] = '=max(0,SUMPRODUCT((INDIRECT(ADDRESS(3, COLUMN() + 3) & ":" & ADDRESS(3, COLUMNS($A$1:$1)))<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" & ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" & ADDRESS(4, COLUMNS($A$1:$1)))))' #'=max(0,SUMPRODUCT(($G$3:$3<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" & ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" & ADDRESS(4, COLUMNS($A$1:$1)))))'
+        # insert columns for the grade and the Q score
+
+        df.insert(3, "O", "")
+        df.loc[hdr + 1:, "O"] = '=SUMPRODUCT((INDIRECT(ADDRESS(3, COLUMN()+2) & ":" & ADDRESS(3, COLUMNS($A$1:$1)))="O") * INDIRECT(ADDRESS(ROW(), COLUMN() + 2) & ":" & ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 2) & ":" & ADDRESS(4, COLUMNS($A$1:$1))))'
+
+
+        df.insert(4, "T", "")
+        df.loc[hdr + 1:, "T"] = '=INDIRECT(ADDRESS(ROW(), COLUMN()-1)) + INDIRECT(ADDRESS(ROW(), COLUMN()-2))'
+
+        #  *** ADD NEW COLUMNS HERE ***
+
+        # Insert the NIA column
+        df.insert(2, "NIA", "")
+
+        for exam_id in df.iloc[hdr+1:, 0].tolist():
+            symbol, text, _ = nia.get_nia(int(exam_id))
+            df.loc[int(exam_id), "NIA"] = symbol + text
+
+        df.insert(3, "NAME", "")
+        for exam_id in df.iloc[hdr+1:, 0].tolist():
+            symbol, text, num_nia = nia.get_nia(int(exam_id))
+            df.loc[int(exam_id), "NAME"] = students_data.get_name(num_nia) if num_nia is not None else ""
+
+        df.insert(4, "SEC", "")
+        for exam_id in df.iloc[hdr+1:, 0].tolist():
+            symbol, text, num_nia = nia.get_nia(int(exam_id))
+            df.loc[int(exam_id), "SEC"] = students_data.get_group(num_nia) if num_nia is not None else ""
+
+        df.iloc[hdr, 0:8] = ["EXAM", "#", "NIA", "NAME", "SEC", "Q", "O", "T"]
 
         df.to_csv(table_filename, sep='\t', index=False, header=False)
 
