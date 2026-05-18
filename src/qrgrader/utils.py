@@ -157,3 +157,13 @@ def file_hash(path, length=256):
     except Exception as e:
         print(f"Error computing hash for {path}: {e}")
         return None
+
+class SortedSet(list):
+    def append(self, value):
+        if not value in self:
+            super().append(value)
+            self.sort()
+
+    def remove(self, value):
+        if value in self:
+            super().remove(value)

@@ -19,7 +19,7 @@ from qrgrader.dialogs import ControlDialog, NameListDialog
 from swikv4.widgets.swik_basic_widget import SwikBasicWidget
 
 from qrgrader.filter_dialog import FilterDialog
-from qrgrader.utils import makedir
+from qrgrader.utils import makedir, SortedSet
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet
 from qrgrader.common import check_workspace, get_workspace_paths, Questions, StudentsData, get_prefix, Nia
@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
         self.cfg_buttons_font = self.config.root().addPrivate("buttons_font")
         self.config.load()
 
-        self.multiple_marked_exams = []
+        self.multiple_marked_exams = SortedSet()
         self.auto_avance = False
         self.current_exam = None
         self.detected = CodeSet()
@@ -114,7 +114,7 @@ class MainWindow(QMainWindow):
         self.central_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.central_widget)
         self.pdf_tree = PDFTree()
-        self.pdf_tree.setColumnCount(4)
+        self.pdf_tree.setColumnCount(5)
         self.swik = SwikBasicWidget()
         self.swik.view.document_ready.connect(self.load_finished)
         self.splitter = QSplitter()
@@ -126,8 +126,8 @@ class MainWindow(QMainWindow):
         self.name_lbl.double_click.connect(self.name_double_clicked)
 
 
-        self.nia_lbl = QLabel()#EditableLabel()
-        #self.nia_lbl.new_value.connect(self.change_nia)
+        self.nia_lbl = EditableLabel()
+        self.nia_lbl.new_value.connect(self.nia_changed)
         self.nia_lbl.setMinimumWidth(100)
         self.nia_lbl.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
 
@@ -220,16 +220,7 @@ class MainWindow(QMainWindow):
                 score = self.get_full_score(exam_id)
                 item.setText(3, str(round(score, 2)))
 
-                # Check if multiple marks or bad NIA
-                symbol, _, nia = self.xls_nia.get_nia(exam_id)
-                multiple = self.get_number_of_multiple_marked_questions(exam_id)
-                if multiple > 0:
-                    item.setText(2, str(multiple))
-                    self.multiple_marked_exams.append(exam_id)
-                    self.multiple_marked_exams=list(set(self.multiple_marked_exams))
-                    self.multiple_marked_exams.sort()
-                else:
-                    item.setText(2, symbol)
+                self.update_exclamation_column(item, exam_id)
 
                 if len(self.rubrics) > 0:
                     self.update_done_color(item)
@@ -242,6 +233,21 @@ class MainWindow(QMainWindow):
             # add shortcut to find people
 
         QTimer.singleShot(100, delayed)
+
+
+    def update_exclamation_column(self, item, exam_id):
+        # Check if multiple marks or bad NIA
+        nia_symbol, _, nia = self.xls_nia.get_nia(exam_id)
+        multiple = self.get_number_of_multiple_marked_questions(exam_id)
+        if multiple > 0:
+            multiple_symbol =  str(multiple)
+            self.multiple_marked_exams.append(exam_id)
+        else:
+            multiple_symbol =  ""
+            self.multiple_marked_exams.remove(exam_id)
+        item.setText(2, multiple_symbol if nia_symbol == "" else nia_symbol)
+        return multiple
+
 
     def toggle_auto_advance(self):
         self.auto_avance = not self.auto_avance
@@ -273,19 +279,25 @@ class MainWindow(QMainWindow):
                 break
 
     def name_label_changed(self, name):
-        nia = str(self.xls_data.get_nia_from_name(name))
+        nia = self.xls_data.get_nia_from_name(name)
+        self.nia_changed(nia)
+
+    def nia_changed(self, nia):
+        nia = str(nia)
         codes = self.type_n.select(exam=self.current_exam % 1000)
-        for code in codes:
-            code.marked = False
-        for i, char in enumerate(nia):
-            code = "N" + str(self.current_exam) + f"{i}{char}"
-            code = self.type_n.get_code_by_data(code)
-            code.marked = True
-        self.detected.save(self.dir_data + self.prefix + "detected.csv")
-        # self.xls_nia.set_nia(self.current_exam, nia)
-        self.xls_nia.update_exam(self.current_exam)
-        self.process_exam()
-        self.update_labels()
+        if codes is not None:
+            for code in codes:
+                code.marked = False
+            for i, char in enumerate(nia):
+                code = "N" + str(self.current_exam) + f"{i}{char}"
+                code = self.type_n.get_code_by_data(code)
+                code.marked = True
+            self.detected.save(self.dir_data + self.prefix + "detected.csv")
+            # self.xls_nia.set_nia(self.current_exam, nia)
+            self.xls_nia.update_exam(self.current_exam)
+            self.process_exam()
+            self.update_labels()
+
 
     def toggle_locked(self):
         self.locked = not self.locked
@@ -361,18 +373,6 @@ class MainWindow(QMainWindow):
         else:
             self.setGeometry(x, y, w, h)
         super().show()
-
-    # def change_nia(self, nia):
-    #     self.xls_nia.set_nia(self.current_exam, nia)
-    #     self.xls_nia.save()
-    #     item = self.pdf_tree.currentItem()
-    #     exam_id = int(item.text(1))
-    #     symbol, _, nia = self.xls_nia.get_nia(exam_id)
-    #     multiple = self.get_number_of_multiple_marked_questions(exam_id)
-    #     if multiple > 0:
-    #         item.setText(2, str(multiple))
-    #     else:
-    #         item.setText(2, symbol)
 
     def find_people(self):
         text, ok = QInputDialog.getText(self, "Find People", "Enter NIA or Name:")
@@ -723,7 +723,6 @@ class MainWindow(QMainWindow):
         else:
             self.changed.remove(code)
 
-        self.changed.save(self.dir_data + self.prefix + "changed.csv")
 
         code.marked = not code.marked
         self.process_exam()
@@ -734,26 +733,16 @@ class MainWindow(QMainWindow):
             self.update_scores_layout()
             self.update_pdf_tree_score()
 
-        self.detected.save(self.dir_data + self.prefix + "detected.csv")
-
-        item = self.pdf_tree.currentItem()
-        symbol, _, nia = self.xls_nia.get_nia(code.unique)
-        multiple = self.get_number_of_multiple_marked_questions(code.exam)
-        if multiple > 0:
-            item.setText(2, str(multiple))
-            self.multiple_marked_exams.append(code.unique)
-            self.multiple_marked_exams = list(set(self.multiple_marked_exams))
-            self.multiple_marked_exams.sort()
-        else:
-            item.setText(2, symbol)
-            if code.unique in self.multiple_marked_exams:
-                self.multiple_marked_exams.remove(code.unique)
-
+        if self.update_exclamation_column(self.pdf_tree.currentItem(), code.unique) == 0:
             if self.auto_avance:
                 self.go_next_exam()
             else:
                 self.swik.view.setBackgroundBrush(QColor(0, 255, 0, 100))
                 QTimer.singleShot(100, lambda: self.swik.view.setBackgroundBrush(Qt.white))
+
+        self.changed.save(self.dir_data + self.prefix + "changed.csv")
+        self.detected.save(self.dir_data + self.prefix + "detected.csv")
+
 
     def move_codes(self, page, x, y, scale=1):
         page_codes_type_a = self.type_a.select(exam=self.current_exam % 1000, pdf_page=page + 1)
