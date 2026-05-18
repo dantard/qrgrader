@@ -38,6 +38,10 @@ class CodeSet:
     def __iter__(self):
         return iter(self.codes.values())
 
+    def remove(self, code):
+        if code.data in self.codes:
+            del self.codes[code.data]
+
     def select(self, **kwargs):
         # chatGPT replaced this
         # filtered = [x for x in self.codes.values() if all(getattr(x, key) == value for key, value in kwargs.items())]

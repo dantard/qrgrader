@@ -220,12 +220,17 @@ class Rubric(QListWidget):
 
     def get_dialog(self, button=None):
 
-        dialog = ButtonEditDialog(self, button)
+        dialog = ButtonEditDialog(self, button, [name for name in self.schema_dictionary])
 
         if not dialog.exec():
             return None
 
         name, kind, config = dialog.get()
+
+        # if name in self.schema_dictionary:
+        #     QMessageBox().critical(self, "Error", "A button with this name already exists.")
+        #     return self.get_dialog(button)
+
 
         self.schema_dictionary[name] = config
 

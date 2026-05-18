@@ -6,7 +6,7 @@ import signal
 from random import shuffle
 
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
-from PyQt5.QtGui import QPen, QKeySequence
+from PyQt5.QtGui import QPen, QKeySequence, QColor
 from PyQt5.QtWidgets import QApplication, QInputDialog, QShortcut, QProgressDialog, QMessageBox, QPushButton, QMenu, \
     QComboBox
 from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, QSplitter, QGraphicsRectItem, \
@@ -84,6 +84,8 @@ class MainWindow(QMainWindow):
         self.cfg_buttons_font = self.config.root().addPrivate("buttons_font")
         self.config.load()
 
+        self.multiple_marked_exams = []
+        self.auto_avance = False
         self.current_exam = None
         self.detected = CodeSet()
         self.type_a = None
@@ -124,8 +126,8 @@ class MainWindow(QMainWindow):
         self.name_lbl.double_click.connect(self.name_double_clicked)
 
 
-        self.nia_lbl = EditableLabel()
-        self.nia_lbl.new_value.connect(self.change_nia)
+        self.nia_lbl = QLabel()#EditableLabel()
+        #self.nia_lbl.new_value.connect(self.change_nia)
         self.nia_lbl.setMinimumWidth(100)
         self.nia_lbl.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
 
@@ -181,6 +183,10 @@ class MainWindow(QMainWindow):
         self.shortcut.activated.connect(self.find_people)
         self.shortcut2 = QShortcut(QKeySequence('Ctrl+L'), self)
         self.shortcut2.activated.connect(self.toggle_locked)
+        self.shortcut3 = QShortcut(QKeySequence('Esc'), self)
+        self.shortcut3.activated.connect(self.go_next_exam)
+        self.shortcut4 = QShortcut(QKeySequence('Ctrl+A'), self)
+        self.shortcut4.activated.connect(self.toggle_auto_advance)
 
         self.show()
 
@@ -217,8 +223,11 @@ class MainWindow(QMainWindow):
                 # Check if multiple marks or bad NIA
                 symbol, _, nia = self.xls_nia.get_nia(exam_id)
                 multiple = self.get_number_of_multiple_marked_questions(exam_id)
-                if  multiple > 0:
+                if multiple > 0:
                     item.setText(2, str(multiple))
+                    self.multiple_marked_exams.append(exam_id)
+                    self.multiple_marked_exams=list(set(self.multiple_marked_exams))
+                    self.multiple_marked_exams.sort()
                 else:
                     item.setText(2, symbol)
 
@@ -233,6 +242,35 @@ class MainWindow(QMainWindow):
             # add shortcut to find people
 
         QTimer.singleShot(100, delayed)
+
+    def toggle_auto_advance(self):
+        self.auto_avance = not self.auto_avance
+
+    def go_next_exam(self):
+
+        current = self.pdf_tree.currentItem()
+        if current is None:
+            return
+
+        exam_id = int(current.text(1)) if current is not None else None
+        if len(self.multiple_marked_exams) > 0:
+            if exam_id in self.multiple_marked_exams:
+                position = self.multiple_marked_exams.index(exam_id)
+                next_exam_id = self.multiple_marked_exams[(position + 1) % len(self.multiple_marked_exams)]
+            else:
+                next_exam_id = self.multiple_marked_exams[0]
+        else:
+            current_index = self.pdf_tree.indexOfTopLevelItem(current)
+            next_index = (current_index + 1) % self.pdf_tree.topLevelItemCount()
+            next_exam_id = int(self.pdf_tree.topLevelItem(next_index).text(1))
+
+        for index in range(self.pdf_tree.topLevelItemCount()):
+            item = self.pdf_tree.topLevelItem(index)
+            exam_id = int(item.text(1))
+            if exam_id == next_exam_id:
+                self.pdf_tree.setCurrentItem(item)
+                self.pdf_tree.scrollToItem(item)
+                break
 
     def name_label_changed(self, name):
         nia = str(self.xls_data.get_nia_from_name(name))
@@ -324,17 +362,17 @@ class MainWindow(QMainWindow):
             self.setGeometry(x, y, w, h)
         super().show()
 
-    def change_nia(self, nia):
-        self.xls_nia.set_nia(self.current_exam, nia)
-        self.xls_nia.save()
-        item = self.pdf_tree.currentItem()
-        exam_id = int(item.text(1))
-        symbol, _, nia = self.xls_nia.get_nia(exam_id)
-        multiple = self.get_number_of_multiple_marked_questions(exam_id)
-        if multiple > 0:
-            item.setText(2, str(multiple))
-        else:
-            item.setText(2, symbol)
+    # def change_nia(self, nia):
+    #     self.xls_nia.set_nia(self.current_exam, nia)
+    #     self.xls_nia.save()
+    #     item = self.pdf_tree.currentItem()
+    #     exam_id = int(item.text(1))
+    #     symbol, _, nia = self.xls_nia.get_nia(exam_id)
+    #     multiple = self.get_number_of_multiple_marked_questions(exam_id)
+    #     if multiple > 0:
+    #         item.setText(2, str(multiple))
+    #     else:
+    #         item.setText(2, symbol)
 
     def find_people(self):
         text, ok = QInputDialog.getText(self, "Find People", "Enter NIA or Name:")
@@ -373,6 +411,8 @@ class MainWindow(QMainWindow):
 
         self.type_p = self.detected.select(type=Code.TYPE_P)
         self.type_q = self.detected.select(type=Code.TYPE_Q)
+
+        self.changed.load(self.dir_data + self.prefix + "changed.csv")
 
     def load_tables(self):
 
@@ -489,6 +529,8 @@ class MainWindow(QMainWindow):
         return total
 
     def pdf_tree_selection_changed(self, current, previous):
+        # this is to prevent the timer from being triggered when the
+        # user clicks on another exam while the timer is still running
         self.progress_dialog = QProgressDialog("Loading exam...", None, 0, 0, self)
         self.progress_dialog.setWindowModality(Qt.ApplicationModal)
         self.progress_dialog.setAutoClose(False)
@@ -573,6 +615,9 @@ class MainWindow(QMainWindow):
                         r.setPen(QPen(Qt.green, 2))
                     else:
                         r.setPen(QPen(Qt.red, 2))
+                else:
+                    if self.changed.get(code) is not None:
+                        r.setPen(QPen(Qt.cyan, 2))
 
             page_codes_type_n = self.type_n.select(exam=exam_id, pdf_page=index + 1)
             for code in page_codes_type_n:
@@ -585,6 +630,21 @@ class MainWindow(QMainWindow):
         yellow = self.get_multiple_marks(exam_id)
         for answer in yellow:
             marks[answer].setPen(QPen(Qt.yellow, 2))
+
+            if answer == yellow[0]:
+                def delayed():
+                    try:
+                        # The Mark may have disappeared if the user
+                        # selected another exam, so we need to try
+                        # self.swik.view.ensureVisible(marks[answer])
+                        self.swik.view.centerOn(marks[answer])
+                    except RuntimeError:
+                        pass
+
+                # It gives the user a chance to see the yellow mark removed
+                # before moving the view, which can be disorienting if it moves suddenly
+                QTimer.singleShot(500, delayed)
+
 
     def get_full_score(self, exam_id):
         total = 0
@@ -657,8 +717,14 @@ class MainWindow(QMainWindow):
         return len(type_p) != len(type_q)
 
     def code_clicked(self, code):
-        self.changed.append(code)
+        changed = self.changed.get(code)
+        if changed is None:
+            self.changed.append(code)
+        else:
+            self.changed.remove(code)
+
         self.changed.save(self.dir_data + self.prefix + "changed.csv")
+
         code.marked = not code.marked
         self.process_exam()
         if code.data.startswith("N"):
@@ -675,8 +741,19 @@ class MainWindow(QMainWindow):
         multiple = self.get_number_of_multiple_marked_questions(code.exam)
         if multiple > 0:
             item.setText(2, str(multiple))
+            self.multiple_marked_exams.append(code.unique)
+            self.multiple_marked_exams = list(set(self.multiple_marked_exams))
+            self.multiple_marked_exams.sort()
         else:
             item.setText(2, symbol)
+            if code.unique in self.multiple_marked_exams:
+                self.multiple_marked_exams.remove(code.unique)
+
+            if self.auto_avance:
+                self.go_next_exam()
+            else:
+                self.swik.view.setBackgroundBrush(QColor(0, 255, 0, 100))
+                QTimer.singleShot(100, lambda: self.swik.view.setBackgroundBrush(Qt.white))
 
     def move_codes(self, page, x, y, scale=1):
         page_codes_type_a = self.type_a.select(exam=self.current_exam % 1000, pdf_page=page + 1)

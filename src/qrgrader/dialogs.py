@@ -4,16 +4,20 @@ from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (QLineEdit, QPushButton, QSpinBox, QDialog, QDialogButtonBox, QComboBox, QDoubleSpinBox,
                              QFormLayout, QCheckBox, QApplication, QDialog, QPushButton,
                              QGridLayout, QVBoxLayout, QHBoxLayout,
-                             QDialogButtonBox, QLabel, QTreeWidget, QTreeWidgetItem, QHeaderView)
+                             QDialogButtonBox, QLabel, QTreeWidget, QTreeWidgetItem, QHeaderView, QStatusBar)
 
 from qrgrader.widget_utils import WidgetsRow, VBox
 
 
 class ButtonEditDialog(QDialog):
-    def __init__(self, draggable_list, button=None):
+    def __init__(self, draggable_list, button=None, existing_names=None):
         super().__init__()
 
         schema = button.get_config() if button is not None else {}
+        self.existing_names = existing_names if existing_names is not None else []
+
+        if button is not None and button.get_name() in self.existing_names:
+            self.existing_names.remove(button.get_name())
 
         self.draggable_list = draggable_list
         self.setWindowTitle("Edit")
@@ -33,9 +37,9 @@ class ButtonEditDialog(QDialog):
         self.layout.addWidget(WidgetsRow("Type", self.combo))
 
         self.le = QLineEdit()
-        self.le.textChanged.connect(
-            lambda: self.buttonBox.buttons()[0].setEnabled(self.le.text() != ""))  # type: ignore
+        self.le.textChanged.connect(self.check_valid_name)  # type: ignore
         self.le.setText(button.get_name() if button is not None else "")
+        self.le.setPlaceholderText("Unique name")
         self.layout.addWidget(WidgetsRow("Name", self.le))
 
         # self.value = QComboBox()
@@ -85,6 +89,11 @@ class ButtonEditDialog(QDialog):
         self.combo.currentTextChanged.connect(self.cb_changed)  # type: ignore
 
         self.enable_widgets()
+
+    def check_valid_name(self, text):
+        ok = self.le.text() != "" and self.le.text() not in self.existing_names
+        self.buttonBox.buttons()[0].setEnabled(ok)
+
 
     def spin_value_changed(self, value):
         if value < 0:
