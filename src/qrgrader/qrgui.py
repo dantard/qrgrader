@@ -239,13 +239,22 @@ class MainWindow(QMainWindow):
         # Check if multiple marks or bad NIA
         nia_symbol, _, nia = self.xls_nia.get_nia(exam_id)
         multiple = self.get_number_of_multiple_marked_questions(exam_id)
+
+        query = self.changed.select(exam=exam_id % 1000, type=Code.TYPE_A)
+
         if multiple > 0:
             multiple_symbol =  str(multiple)
             self.multiple_marked_exams.append(exam_id)
         else:
             multiple_symbol =  ""
             self.multiple_marked_exams.remove(exam_id)
-        item.setText(2, multiple_symbol if nia_symbol == "" else nia_symbol)
+
+        symbol = multiple_symbol if nia_symbol == "" else nia_symbol
+
+        if symbol == "" and len(query) > 0:
+            symbol = chr(64 + len(query))
+
+        item.setText(2, symbol)
         return multiple
 
 
@@ -256,16 +265,20 @@ class MainWindow(QMainWindow):
 
         current = self.pdf_tree.currentItem()
         if current is None:
+            print("current none")
             return
 
         exam_id = int(current.text(1)) if current is not None else None
         if len(self.multiple_marked_exams) > 0:
+            print("len not none")
+
             if exam_id in self.multiple_marked_exams:
                 position = self.multiple_marked_exams.index(exam_id)
                 next_exam_id = self.multiple_marked_exams[(position + 1) % len(self.multiple_marked_exams)]
             else:
                 next_exam_id = self.multiple_marked_exams[0]
         else:
+            print("len none")
             current_index = self.pdf_tree.indexOfTopLevelItem(current)
             next_index = (current_index + 1) % self.pdf_tree.topLevelItemCount()
             next_exam_id = int(self.pdf_tree.topLevelItem(next_index).text(1))
@@ -738,7 +751,7 @@ class MainWindow(QMainWindow):
                 self.go_next_exam()
             else:
                 self.swik.view.setBackgroundBrush(QColor(0, 255, 0, 100))
-                QTimer.singleShot(100, lambda: self.swik.view.setBackgroundBrush(Qt.white))
+                QTimer.singleShot(250, lambda: self.swik.view.setBackgroundBrush(Qt.white))
 
         self.changed.save(self.dir_data + self.prefix + "changed.csv")
         self.detected.save(self.dir_data + self.prefix + "detected.csv")
