@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, 
     QTabWidget, QLabel, QVBoxLayout, \
     QSizePolicy, QFormLayout, QCheckBox, QGroupBox
 from easyconfig2.easyconfig import EasyConfig2
+from scipy.stats import norm
 from swikv4.pages.swik_page import SwikPage
 
 from qrgrader.dialogs import ControlDialog, NameListDialog
@@ -91,6 +92,9 @@ class MainWindow(QMainWindow):
         self.type_a = None
         self.type_n: CodeSet = None
         self.changed = CodeSet()
+
+        self.file_menu = self.menuBar().addMenu("File")
+        self.file_menu.addAction("Graphs", self.show_graphs)
 
         # Rubrics
         self.rubrics = []
@@ -233,6 +237,45 @@ class MainWindow(QMainWindow):
             # add shortcut to find people
 
         QTimer.singleShot(100, delayed)
+
+
+    def show_graphs(self):
+        import pyqtgraph as pg
+        import numpy as np
+        # 1. Create the PyQtGraph window
+
+        data = []
+        for index in range(self.pdf_tree.topLevelItemCount()):
+            item = self.pdf_tree.topLevelItem(index)
+            exam_id = int(item.text(1))
+
+            # Update scores
+            score = self.get_full_score(exam_id)
+            data.append(score)
+
+
+        win = pg.GraphicsLayoutWidget(show=True, title="Distribution Graph")
+        win.resize(800, 600)
+
+        # Add a plot
+        plot = win.addPlot(title="Normal Distribution & Histogram")
+
+        # 2. Plot the Histogram
+        # We use density=True to get a normalized probability distribution
+        y, x = np.histogram(data + [0,10], bins=10, density=True)
+
+        # BarGraphItem is perfect for discrete bins
+        bg_item = pg.BarGraphItem(x=x[:-1], height=y, width=np.diff(x), brush='b', pen='w')
+        plot.addItem(bg_item)
+        # 3. Plot the continuous Probability Density Function (PDF)
+        # Generate a smooth x-axis range for the curve
+        x_pdf = np.linspace(0, 10, 20)
+        y_pdf = norm.pdf(x_pdf, np.mean(data), np.std(data))
+
+        # PlotCurveItem handles smooth lines
+#        plot.plot(x_pdf, y_pdf, pen=pg.mkPen('r', width=3), name='Fitted PDF')
+
+
 
 
     def update_exclamation_column(self, item, exam_id):
