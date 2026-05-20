@@ -4,9 +4,12 @@ import sys
 import signal
 
 from random import shuffle
+import pyqtgraph as pg
+import numpy as np
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QCheckBox
 
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer
-from PyQt5.QtGui import QPen, QKeySequence, QColor
+from PyQt5.QtGui import QPen, QKeySequence, QColor, QPalette
 from PyQt5.QtWidgets import QApplication, QInputDialog, QShortcut, QProgressDialog, QMessageBox, QPushButton, QMenu, \
     QComboBox
 from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, QSplitter, QGraphicsRectItem, \
@@ -71,6 +74,15 @@ class DoubleClickableLabel(QLabel):
         super().mouseDoubleClickEvent(event)
         self.double_click.emit()
 
+class EnhancedLabel(QLabel):
+
+    def set(self, color=Qt.black, bold=False):
+        palette = self.palette()
+        palette.setColor(QPalette.WindowText, color)
+        self.setPalette(palette)
+        font = self.font()
+        font.setBold(bold)
+        self.setFont(font)
 
 class MainWindow(QMainWindow):
     def __init__(self, schema_filenames, args):
@@ -118,7 +130,7 @@ class MainWindow(QMainWindow):
         self.central_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.central_widget)
         self.pdf_tree = PDFTree()
-        self.pdf_tree.setColumnCount(5)
+        self.pdf_tree.setColumnCount(4)
         self.swik = SwikBasicWidget()
         self.swik.view.document_ready.connect(self.load_finished)
         self.splitter = QSplitter()
@@ -139,6 +151,10 @@ class MainWindow(QMainWindow):
         self.group_lbl.setMinimumWidth(100)
         self.group_lbl.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
 
+        self.exam_id_lbl = EnhancedLabel()
+        self.exam_id_lbl.setMinimumWidth(100)
+        self.exam_id_lbl.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+
         details_layout = QHBoxLayout()
         details_layout.setAlignment(Qt.AlignLeft)
         details_layout.addWidget(QLabel("Name:"))
@@ -147,6 +163,8 @@ class MainWindow(QMainWindow):
         details_layout.addWidget(self.nia_lbl)
         details_layout.addWidget(QLabel("Group:"))
         details_layout.addWidget(self.group_lbl)
+        details_layout.addWidget(QLabel("Exam ID:"))
+        details_layout.addWidget(self.exam_id_lbl)
 
         self.main_layout.addWidget(self.splitter)
         self.main_layout.addLayout(details_layout)
@@ -238,46 +256,6 @@ class MainWindow(QMainWindow):
 
         QTimer.singleShot(100, delayed)
 
-
-    def show_graphs(self):
-        import pyqtgraph as pg
-        import numpy as np
-        # 1. Create the PyQtGraph window
-
-        data = []
-        for index in range(self.pdf_tree.topLevelItemCount()):
-            item = self.pdf_tree.topLevelItem(index)
-            exam_id = int(item.text(1))
-
-            # Update scores
-            score = self.get_full_score(exam_id)
-            data.append(score)
-
-
-        win = pg.GraphicsLayoutWidget(show=True, title="Distribution Graph")
-        win.resize(800, 600)
-
-        # Add a plot
-        plot = win.addPlot(title="Normal Distribution & Histogram")
-
-        # 2. Plot the Histogram
-        # We use density=True to get a normalized probability distribution
-        y, x = np.histogram(data + [0,10], bins=10, density=True)
-
-        # BarGraphItem is perfect for discrete bins
-        bg_item = pg.BarGraphItem(x=x[:-1], height=y, width=np.diff(x), brush='b', pen='w')
-        plot.addItem(bg_item)
-        # 3. Plot the continuous Probability Density Function (PDF)
-        # Generate a smooth x-axis range for the curve
-        x_pdf = np.linspace(0, 10, 20)
-        y_pdf = norm.pdf(x_pdf, np.mean(data), np.std(data))
-
-        # PlotCurveItem handles smooth lines
-#        plot.plot(x_pdf, y_pdf, pen=pg.mkPen('r', width=3), name='Fitted PDF')
-
-
-
-
     def update_exclamation_column(self, item, exam_id):
         # Check if multiple marks or bad NIA
         nia_symbol, _, nia = self.xls_nia.get_nia(exam_id)
@@ -288,9 +266,13 @@ class MainWindow(QMainWindow):
         if multiple > 0:
             multiple_symbol =  str(multiple)
             self.multiple_marked_exams.append(exam_id)
+            if self.current_exam ==  exam_id:
+                self.exam_id_lbl.set(color=Qt.red, bold=True)
         else:
             multiple_symbol =  ""
             self.multiple_marked_exams.remove(exam_id)
+            if self.current_exam ==  exam_id:
+                self.exam_id_lbl.set()
 
         symbol = multiple_symbol if nia_symbol == "" else nia_symbol
 
@@ -299,7 +281,6 @@ class MainWindow(QMainWindow):
 
         item.setText(2, symbol)
         return multiple
-
 
     def toggle_auto_advance(self):
         self.auto_avance = not self.auto_avance
@@ -616,11 +597,17 @@ class MainWindow(QMainWindow):
         self.nia_lbl.setText(str(nia))
         self.name_lbl.setText(str(self.xls_data.get_name(nia)))
         self.group_lbl.setText(str(self.xls_data.get_group(nia)))
+        self.exam_id_lbl.setText(str(self.current_exam))
+        multiple = self.get_number_of_multiple_marked_questions(self.current_exam)
+        if multiple > 0:
+            self.exam_id_lbl.set(color=Qt.red, bold=True)
+        else:
+            self.exam_id_lbl.set()
+
 
     def load_finished(self):
         self.process_exam()
         self.update_labels()
-
         for rubric in self.rubrics:
             rubric.pull(self.current_exam)
 
@@ -714,11 +701,21 @@ class MainWindow(QMainWindow):
 
         return total
 
+
     def update_all_pdf_tree_scores(self):
-        for index in range(self.pdf_tree.topLevelItemCount()):
-            item = self.pdf_tree.topLevelItem(index)
-            score = self.get_full_score(int(item.text(1)))
-            item.setText(3, str(round(score, 2)))
+        progress = QProgressDialog("Updating scores...", None, 0, self.pdf_tree.topLevelItemCount()-1, self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setWindowTitle("QRGrader")
+        progress.show()
+        def delayed():
+            for index in range(self.pdf_tree.topLevelItemCount()):
+                item = self.pdf_tree.topLevelItem(index)
+                score = self.get_full_score(int(item.text(1)))
+                item.setText(3, str(round(score, 2)))
+                progress.setValue(index)
+            progress.hide()
+        QTimer.singleShot(100, delayed)
+
 
     def update_pdf_tree_score(self):
         for index in range(self.pdf_tree.topLevelItemCount()):
@@ -792,9 +789,8 @@ class MainWindow(QMainWindow):
         if self.update_exclamation_column(self.pdf_tree.currentItem(), code.unique) == 0:
             if self.auto_avance:
                 self.go_next_exam()
-            else:
-                self.swik.view.setBackgroundBrush(QColor(0, 255, 0, 100))
-                QTimer.singleShot(250, lambda: self.swik.view.setBackgroundBrush(Qt.white))
+
+
 
         self.changed.save(self.dir_data + self.prefix + "changed.csv")
         self.detected.save(self.dir_data + self.prefix + "detected.csv")
@@ -826,6 +822,38 @@ class MainWindow(QMainWindow):
 
         self.process_exam()
 
+    def show_graphs(self):
+
+        rubrics = {"quiz": [], "total": []}
+        for r in self.rubrics:
+            rubrics[r.name] = []
+
+        for index in range(self.pdf_tree.topLevelItemCount()):
+            exam_id = int(self.pdf_tree.topLevelItem(index).text(1))
+
+            quiz_score, quiz_full_value = self.get_quiz_score(exam_id)
+            rubrics["quiz"].append(round(10.0*quiz_score/quiz_full_value,2) if quiz_full_value != 0 else 0)
+
+            total = round(quiz_score,2)
+            for r in self.rubrics:
+                rubric_value, rubric_full_value = r.compute_score(exam_id)
+                total += round(rubric_value,2)
+                rubrics[r.name].append(round(10.0*rubric_value/rubric_full_value,2) if rubric_full_value != 0 else 0)
+
+            rubrics["total"].append(total)
+
+        self.win = pg.GraphicsLayoutWidget(show=True, title="Distribution Graph")
+        self.win.resize(800, 600)
+
+        plot = self.win.addPlot(title="Distribution")
+        plot.addLegend()
+
+        brushes = ['r', 'g', 'b', 'c', 'm', 'y']
+
+        for i, (name, data) in enumerate(rubrics.items()):
+            y, x = np.histogram(data + [0,10], bins=10, density=True)
+            bg_item = pg.BarGraphItem(x=x[:-1], height=y, width=np.diff(x), brush=brushes[i % len(brushes)], pen='w', name=f'{name}')
+            plot.addItem(bg_item)
 
 def main():
     app = QApplication(sys.argv)

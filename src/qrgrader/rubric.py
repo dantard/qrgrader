@@ -31,10 +31,10 @@ class Rubric(QListWidget):
         self.scores = {}
         self.schema_dictionary = {}
         self.schema_filename = schema_filename
-        name = self.schema_filename.split(".")[0]
-        self.scores_filename = name + ".yaml"
+        self.name = self.schema_filename.split(".")[0]
+        self.scores_filename = self.name + ".yaml"
 
-        self.xls_filename = dir_xls + get_date() + "_" + name + ".csv"
+        self.xls_filename = dir_xls + get_date() + "_" + self.name + ".csv"
         self.current_exam_id = None
         self.modified = False
         self.buttons_height = kwargs.get("buttons_height")

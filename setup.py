@@ -14,7 +14,8 @@ setup(
         'pydrive2',
         'opencv-python-headless',
         'pandas',
-        'swikv4-minimal >= 0.0.5'
+        'swikv4-minimal >= 0.0.5',
+        'pyqtgraph'
     ],
     author='Danilo Tardioli',
     author_email='dantard@unizar.es',
