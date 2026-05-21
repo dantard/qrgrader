@@ -4,17 +4,27 @@ import gspread
 from gspread.utils import a1_to_rowcol, ValueInputOption
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
+from pathlib import Path
 
+from qrgrader import utils
 from qrgrader.common import get_narrowest_type
+
+FOLDER_MIME = "application/vnd.google-apps.folder"
 
 
 class GDrive:
 
     def __init__(self, config_dir=".", **kwargs):
+        self.stats = {"downloaded": [], "uploaded": [], "skipped_files": [], "skipped_dir": [], "excluded": []}
         self.gdrive = None
         self.config_dir = config_dir
+
         if kwargs.get("authorize", True):
             self.authorize()
+
+    def reset_stats(self):
+        self.stats = {"downloaded": [], "uploaded": [], "skipped_files": [], "skipped_dir": [], "excluded": []}
+
 
     def authorize(self):
 
@@ -73,11 +83,129 @@ class GDrive:
         else:
             return None
 
+
+
     def upload_file(self, filename, folder_id):
-        file = self.gdrive.CreateFile({'title': os.path.basename(filename), 'parents': [{'id': folder_id}]})
+        name = os.path.basename(filename)
+        query = f"title = '{name}' and '{folder_id}' in parents and trashed = false"
+        existing = self.gdrive.ListFile({'q': query}).GetList()
+
+        if existing:
+            file = existing[0]
+            drive_md5 = file.get('md5Checksum')
+            local_md5 = utils.md5(filename)
+            #if "data" in filename:
+            #    print(f"Comparing {name} (drive md5: {drive_md5}, local md5: {local_md5})")
+            if drive_md5 == local_md5:
+                self.stats["skipped_files"].append(name)
+                return file['id']
+            # Reuse existing file to update content and avoid creating a new revision
+            file = self.gdrive.CreateFile({'id': existing[0]['id']})
+        else:
+            file = self.gdrive.CreateFile({'title': name, 'parents': [{'id': folder_id}]})
+
         file.SetContentFile(filename)
         file.Upload()
+        self.stats["uploaded"].append(name)
         return file['id']
+
+    def create_folder(self, name, parent_id="root"):
+        folder = self.gdrive.CreateFile({
+            "title": name,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [{"id": parent_id}],
+        })
+        folder.Upload()
+        return folder["id"]
+
+    def delete_folder(self, folder_id):
+        file = self.gdrive.CreateFile({'id': folder_id})
+        file.Delete()
+
+    def upload_directory(self, local_dir: str, parent_id="root", exclude=None, overwrite=False, is_root=True):
+        local_dir = Path(local_dir)
+        if is_root:
+            if overwrite:
+                query = f"title = '{local_dir.name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and '{parent_id}' in parents"
+                existing = self.gdrive.ListFile({'q': query}).GetList()
+                if existing:
+                    #print(f"Deleting existing '{local_dir.name}/'...")
+                    self.delete_folder(existing[0]['id'])
+                folder_id = self.create_folder(local_dir.name, parent_id)
+            else:
+                query = f"title = '{local_dir.name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and '{parent_id}' in parents"
+                existing = self.gdrive.ListFile({'q': query}).GetList()
+                if existing:
+                    folder_id = existing[0]['id']
+                    #print(f"Entering {local_dir.name}/ (existing)")
+                else:
+                    folder_id = self.create_folder(local_dir.name, parent_id)
+                    #print(f"Entering {local_dir.name}/")
+        else:
+            folder_id = parent_id
+
+        exclude = exclude or []
+        #print(f"Entering {local_dir.name}/")
+
+        for entry in sorted(local_dir.iterdir()):
+            if entry.is_dir():
+                if entry.name in exclude:
+                    #print(f"Skipping directory {entry.name}/")
+                    self.stats["skipped_dir"].append(entry.name)
+                    continue
+                self.upload_directory(entry, parent_id=folder_id, exclude=exclude)
+            elif entry.is_file():
+                if entry.name in exclude:
+                    self.stats["excluded"].append(entry.name)
+                    continue
+                self.upload_file(str(entry), folder_id)
+                print(f"Uploaded {len(self.stats['uploaded'])}, Skipped {len(self.stats['skipped_files'])}, "
+                      f"Excluded {len(self.stats['excluded'])} Processing: {str(entry)}                                        ", end="\r")
+
+        return folder_id
+    def update_download(self, folder_id: str, dest: str):
+        self.download_directory(folder_id, dest, is_root=False)
+
+    def update_upload(self, folder_id: str, local_dir: str):
+        self.upload_directory(local_dir, parent_id=folder_id, is_root=False)
+
+    def download_file(self, file_id, dest_path: Path):
+        f = self.gdrive.CreateFile({'id': file_id})
+        f.FetchMetadata(fields="title,md5Checksum")
+        drive_md5 = f.get('md5Checksum')
+        local_md5 = utils.md5(dest_path) if dest_path.exists() else None
+        if local_md5 == drive_md5:
+            self.stats["skipped_files"].append(dest_path.name)
+            return
+        f.GetContentFile(str(dest_path))
+        self.stats["downloaded"].append(dest_path.name)
+
+
+    def download_directory(self, folder_id: str, dest: str, is_root=True):
+        dest = Path(dest)
+
+        if is_root:
+            meta = self.gdrive.CreateFile({'id': folder_id})
+            meta.FetchMetadata(fields="title")
+            dest = dest / meta['title']
+
+        dest.mkdir(parents=True, exist_ok=True)
+
+        entries = self.gdrive.ListFile(
+            {'q': f"'{folder_id}' in parents and trashed=false"}
+        ).GetList()
+
+        for entry in sorted(entries, key=lambda e: e['title']):
+            local_path = dest / entry['title']
+
+            if entry['mimeType'] == FOLDER_MIME:
+                # print(f"Entering {local_path}")
+                self.download_directory(entry['id'], local_path, is_root=False)
+            else:
+                # print(f"Downloading {entry['title']}")
+                self.download_file(entry['id'], local_path)
+                print(f"Downloaded {len(self.stats['downloaded'])}, Skipped {len(self.stats['skipped_files'])}, "
+                      f"Excluded {len(self.stats['excluded'])} Processing {local_path}                                    ", end="\r")
 
 
 class Sheets:

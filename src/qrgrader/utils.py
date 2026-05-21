@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import zxingcpp
 import hashlib
-
+import hashlib
 def pix2np(pix):
     im = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
     im = np.ascontiguousarray(im[..., [2, 1, 0]])  # rgb to bgr
@@ -25,6 +25,12 @@ def threshold(orig, th):
 
     return thresh
 
+def md5(filepath: Path) -> str:
+    h = hashlib.md5()
+    with open(filepath, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            h.update(chunk)
+    return h.hexdigest()
 
 def get_patches(orig, ppm, size_mm, tolerance=0.25):
     # List for the patches
