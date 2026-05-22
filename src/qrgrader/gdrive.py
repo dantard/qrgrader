@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 
 import gspread
 from gspread.utils import a1_to_rowcol, ValueInputOption
@@ -15,7 +16,8 @@ FOLDER_MIME = "application/vnd.google-apps.folder"
 class GDrive:
 
     def __init__(self, config_dir=".", **kwargs):
-        self.stats = {"downloaded": [], "uploaded": [], "skipped_files": [], "skipped_dir": [], "excluded": []}
+        self.stats = {"downloaded": [], "uploaded": [], "conflict": [],
+                      "skipped_files": [], "skipped_dir": [], "excluded": []}
         self.gdrive = None
         self.config_dir = config_dir
 
@@ -88,26 +90,37 @@ class GDrive:
     def upload_file(self, filename, folder_id):
         name = os.path.basename(filename)
         query = f"title = '{name}' and '{folder_id}' in parents and trashed = false"
-        existing = self.gdrive.ListFile({'q': query}).GetList()
+        online_files = self.gdrive.ListFile({'q': query}).GetList()
 
-        if existing:
-            file = existing[0]
-            drive_md5 = file.get('md5Checksum')
-            local_md5 = utils.md5(filename)
-            #if "data" in filename:
-            #    print(f"Comparing {name} (drive md5: {drive_md5}, local md5: {local_md5})")
+        local_md5 = utils.md5(filename)
+        local_mtime = Path(filename).stat().st_mtime
+        local_mtime = datetime.fromtimestamp(local_mtime, tz=timezone.utc)
+
+        if online_files:
+            file_info = online_files[0]
+            file_id = file_info.get('id')
+            drive_md5 = file_info.get('md5Checksum')
+            online_mtime = file_info.get("modifiedDate")
+            online_mtime = datetime.fromisoformat(online_mtime.replace('Z', '+00:00'))
+
             if drive_md5 == local_md5:
                 self.stats["skipped_files"].append(name)
-                return file['id']
-            # Reuse existing file to update content and avoid creating a new revision
-            file = self.gdrive.CreateFile({'id': existing[0]['id']})
+                os.utime(filename, (online_mtime.timestamp(), online_mtime.timestamp()))
+            elif local_mtime > online_mtime :
+                file = self.gdrive.CreateFile({'id': online_files[0]['id']})
+                file.SetContentFile(filename)
+                file.Upload()
+                self.stats["uploaded"].append(name)
+            else:
+                self.stats["conflict"].append(name)
         else:
             file = self.gdrive.CreateFile({'title': name, 'parents': [{'id': folder_id}]})
+            file.SetContentFile(filename)
+            file.Upload()
+            self.stats["uploaded"].append(name)
+            file_id = file.get('id')
 
-        file.SetContentFile(filename)
-        file.Upload()
-        self.stats["uploaded"].append(name)
-        return file['id']
+        return file_id
 
     def create_folder(self, name, parent_id="root"):
         folder = self.gdrive.CreateFile({
@@ -160,7 +173,7 @@ class GDrive:
                     continue
                 self.upload_file(str(entry), folder_id)
                 print(f"Uploaded {len(self.stats['uploaded'])}, Skipped {len(self.stats['skipped_files'])}, "
-                      f"Excluded {len(self.stats['excluded'])} Processing: {str(entry)}                                        ", end="\r")
+                      f"Conflict {len(self.stats['conflict'])} Processing: {str(entry)}                                        ", end="\r")
 
         return folder_id
     def update_download(self, folder_id: str, dest: str):
@@ -169,16 +182,35 @@ class GDrive:
     def update_upload(self, folder_id: str, local_dir: str):
         self.upload_directory(local_dir, parent_id=folder_id, is_root=False)
 
-    def download_file(self, file_id, dest_path: Path):
+    def download_file(self, file_id, local_path: Path):
         f = self.gdrive.CreateFile({'id': file_id})
-        f.FetchMetadata(fields="title,md5Checksum")
+        f.FetchMetadata(fields="title,md5Checksum,modifiedDate")
         drive_md5 = f.get('md5Checksum')
-        local_md5 = utils.md5(dest_path) if dest_path.exists() else None
-        if local_md5 == drive_md5:
-            self.stats["skipped_files"].append(dest_path.name)
-            return
-        f.GetContentFile(str(dest_path))
-        self.stats["downloaded"].append(dest_path.name)
+        online_mtime = f.get("modifiedDate")
+        online_mtime = datetime.fromisoformat(online_mtime.replace('Z', '+00:00'))
+
+        if local_path.exists():
+            local_mtime = Path(local_path).stat().st_mtime
+            local_mtime = datetime.fromtimestamp(local_mtime, tz=timezone.utc)
+            local_md5 = utils.md5(local_path)
+            if local_md5 == drive_md5:
+                self.stats["skipped_files"].append(local_path.name)
+                os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
+            elif online_mtime > local_mtime:
+                f.GetContentFile(str(local_path))
+                os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
+                self.stats["downloaded"].append(local_path.name)
+            else:
+                self.stats["conflict"].append(local_path.name)
+        else:
+            f.GetContentFile(str(local_path))
+            os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
+            self.stats["downloaded"].append(local_path.name)
+
+        return file_id
+
+
+
 
 
     def download_directory(self, folder_id: str, dest: str, is_root=True):
@@ -205,7 +237,7 @@ class GDrive:
                 # print(f"Downloading {entry['title']}")
                 self.download_file(entry['id'], local_path)
                 print(f"Downloaded {len(self.stats['downloaded'])}, Skipped {len(self.stats['skipped_files'])}, "
-                      f"Excluded {len(self.stats['excluded'])} Processing {local_path}                                    ", end="\r")
+                      f"Conflict {len(self.stats['conflict'])}, Processing {local_path}                          ", end="\r")
 
 
 class Sheets:
