@@ -317,7 +317,8 @@ class Rubric(QListWidget):
         for button in self.filter_buttons(CutterButton):
             cut = min(cut, button.get_percent())
 
-        points = min(points, total * cut)
+        if cut < 1:
+            points = min(points, total * cut)
 
         multiplier = 1
         for button in self.filter_buttons(MultiplierButton):
@@ -355,7 +356,7 @@ class Rubric(QListWidget):
 
             row = "\tWeight"
             for button_name, button_config in filtered.items():
-                row += "\t" + f"{button_config.get("weight", 1)}"
+                row += "\t" + f"{button_config.get('weight', 1)}"
 
             f.write(row + "\n")
 

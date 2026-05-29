@@ -110,7 +110,7 @@ def main():
             print("Done ({:d} exams generated).".format(len(os.listdir(dir_generated))))
 
     if create_generated:
-        print("Creating generated.csv file...", end="")
+        print("Creating generated.csv file")
         logs = sorted([x for x in listdir(dir_temp_generator) if x.endswith(".aux")])
 
         w = open(dir_data + prefix + "generated.csv", "w", encoding='utf-8')
@@ -134,13 +134,12 @@ def main():
                         w.write(line)
             f.close()
         w.close()
-        print("Done.")
 
     if create_questions:
         logs = [x for x in listdir(dir_temp_generator) if x.endswith(".log")]
 
         if len(logs) > 0:
-            print("Creating questions csv file...", end="")
+            print("Creating questions csv file")
 
             any_log_will_do = dir_temp_generator + os.sep + logs[0]
 
@@ -171,9 +170,16 @@ def main():
                                    "\t" + (fields[3] if fields[2] == "d" else fields[4].replace(" ", "")) + \
                                    "\t" + fields[5]
                             data += line + "\n"
+
+                            # Create .scm file for each O type question
+                            if fields[1].strip() == "O":
+                                print("Creating .scm file for open question '{}'".format(fields[5]))
+                                with open(dir_workspace + fields[5] + ".scm", "w") as file:
+                                    file.write(f'config:\n  weight: {fields[3]}\n  page: 0\n  precision: 2\n')
+
                     filew.write(data)
 
-    print("Done.")
+    print("All Done :)")
 
 
 if __name__ == "__main__":

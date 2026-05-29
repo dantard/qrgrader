@@ -106,6 +106,7 @@ class MainWindow(QMainWindow):
         self.changed = CodeSet()
 
         self.file_menu = self.menuBar().addMenu("File")
+        self.file_menu.addAction("Export", self.export_data)
         self.file_menu.addAction("Graphs", self.show_graphs)
 
         # Rubrics
@@ -365,10 +366,10 @@ class MainWindow(QMainWindow):
         rubric = self.get_current_rubric()
         if rubric is not None:
             index = rubric.get_page()
-            try:
-                self.swik.view.move_to_page(index, 10)
-            except Exception as e:
-                pass
+            #try:
+            self.swik.view.move_to_page(index, 10)
+            #except Exception as e:
+            #    pass
 
     def update_done_color(self, item):
         howmany = 0
@@ -557,12 +558,19 @@ class MainWindow(QMainWindow):
 
         for index, r in enumerate(self.rubrics):
             value, full_value = r.compute_score(self.current_exam)
+            over_10 = round(10 * value / full_value, 2)
             self.rubrics_labels[index].setText(
-                "<b>" + str(value) + "</b>/" + str(full_value) + " (" + str(round(10 * value / full_value, 2)) + "/10)")
+                "<b>" + str(value) + "</b>/" + str(full_value) + " (" + str(over_10) + "/10)")
+            self.rubrics_labels[index].setStyleSheet("color: red;" if over_10 > 10 else "")
+
             if self.rubrics_cb[index].isChecked():
                 total += value
 
-        self.total_score_lbl.setText("<b>" + str(round(total, 2)) + "</b>")
+        total = round(total, 2)
+        self.total_score_lbl.setText("<b>" + str(total) + "</b>")
+        self.total_score_lbl.setStyleSheet("color: red;" if total > 10 else "")
+
+
         return total
 
     def pdf_tree_selection_changed(self, current, previous):
@@ -688,6 +696,24 @@ class MainWindow(QMainWindow):
                 # before moving the view, which can be disorienting if it moves suddenly
                 QTimer.singleShot(500, delayed)
 
+
+    def export_data(self):
+        with open(self.dir_xls + self.prefix + "export.csv", "w", encoding='utf-8') as f:
+            f.write("EXAM ID\tTOTAL\tQUIZ")
+            for r in self.rubrics:
+                f.write(f"\t{r.name}")
+            f.write("\n")
+            total = 0
+            for index in range(self.pdf_tree.topLevelItemCount()):
+                item = self.pdf_tree.topLevelItem(index)
+                exam_id = int(item.text(1))
+                quiz, _ = self.get_quiz_score(exam_id)
+                total = self.get_full_score(exam_id)
+                f.write(f"{exam_id}\t{round(total,2)}\t{round(quiz,2)}")
+                for r in self.rubrics:
+                    value, _ = r.compute_score(exam_id)
+                    f.write(f"\t{round(value,2)}")
+                f.write("\n")
 
     def get_full_score(self, exam_id):
         total = 0
