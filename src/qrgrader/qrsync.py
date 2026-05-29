@@ -40,7 +40,7 @@ def main():
 
     dir_workspace, dir_data, _, dir_generated, dir_xls, _, dir_source, date = [None] * 8
 
-    if args.upload_updates or args.download_updates:
+    if args.upload_updates or args.download_updates or args.upload_workspace:
         if not check_workspace():
            print("ERROR: qrupload must be run from a workspace directory")
            sys.exit(1)
@@ -88,7 +88,7 @@ def main():
                 print(" - " + x)
 
     elif args.download_updates:
-        drive.update_download(args.folder_id, dir_workspace)
+        drive.update_download(args.folder_id, dir_workspace, dry=True)
         if len(drive.stats.get("downloaded", 0)) > 0:
             print("Downloaded:")
             for x in drive.stats["downloaded"]:

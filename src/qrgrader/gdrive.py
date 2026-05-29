@@ -135,7 +135,7 @@ class GDrive:
         file = self.gdrive.CreateFile({'id': folder_id})
         file.Delete()
 
-    def upload_directory(self, local_dir: str, parent_id="root", exclude=None, overwrite=False, is_root=True):
+    def upload_directory(self, local_dir: str, parent_id="root", exclude=None, overwrite=False, is_root=True, dry=True):
         local_dir = Path(local_dir)
         if is_root:
             if overwrite:
@@ -176,13 +176,13 @@ class GDrive:
                       f"Conflict {len(self.stats['conflict'])} Processing: {str(entry)}                                        ", end="\r")
 
         return folder_id
-    def update_download(self, folder_id: str, dest: str):
-        self.download_directory(folder_id, dest, is_root=False)
+    def update_download(self, folder_id: str, dest: str, dry=True):
+        self.download_directory(folder_id, dest, is_root=False, dry=dry)
 
     def update_upload(self, folder_id: str, local_dir: str):
         self.upload_directory(local_dir, parent_id=folder_id, is_root=False)
 
-    def download_file(self, file_id, local_path: Path):
+    def download_file(self, file_id, local_path: Path, dry=True):
         f = self.gdrive.CreateFile({'id': file_id})
         f.FetchMetadata(fields="title,md5Checksum,modifiedDate")
         drive_md5 = f.get('md5Checksum')
@@ -194,17 +194,20 @@ class GDrive:
             local_mtime = datetime.fromtimestamp(local_mtime, tz=timezone.utc)
             local_md5 = utils.md5(local_path)
             if local_md5 == drive_md5:
+                if not dry:
+                    os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
                 self.stats["skipped_files"].append(local_path.name)
-                os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
             elif online_mtime > local_mtime:
-                f.GetContentFile(str(local_path))
-                os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
+                if not dry:
+                    f.GetContentFile(str(local_path))
+                    os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
                 self.stats["downloaded"].append(local_path.name)
             else:
                 self.stats["conflict"].append(local_path.name)
         else:
-            f.GetContentFile(str(local_path))
-            os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
+            if not dry:
+                f.GetContentFile(str(local_path))
+                os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
             self.stats["downloaded"].append(local_path.name)
 
         return file_id
@@ -213,7 +216,7 @@ class GDrive:
 
 
 
-    def download_directory(self, folder_id: str, dest: str, is_root=True):
+    def download_directory(self, folder_id: str, dest: str, is_root=True, dry=True):
         dest = Path(dest)
 
         if is_root:
@@ -221,7 +224,8 @@ class GDrive:
             meta.FetchMetadata(fields="title")
             dest = dest / meta['title']
 
-        dest.mkdir(parents=True, exist_ok=True)
+        if not dry:
+            dest.mkdir(parents=True, exist_ok=True)
 
         entries = self.gdrive.ListFile(
             {'q': f"'{folder_id}' in parents and trashed=false"}
@@ -232,10 +236,10 @@ class GDrive:
 
             if entry['mimeType'] == FOLDER_MIME:
                 # print(f"Entering {local_path}")
-                self.download_directory(entry['id'], local_path, is_root=False)
+                self.download_directory(entry['id'], local_path, is_root=False, dry=dry)
             else:
                 # print(f"Downloading {entry['title']}")
-                self.download_file(entry['id'], local_path)
+                self.download_file(entry['id'], local_path, dry=dry)
                 print(f"Downloaded {len(self.stats['downloaded'])}, Skipped {len(self.stats['skipped_files'])}, "
                       f"Conflict {len(self.stats['conflict'])}, Processing {local_path}                          ", end="\r")
 
