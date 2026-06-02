@@ -18,6 +18,16 @@ def get_workspace_paths(base):
     dir_source = dir_workspace + "source" + os.sep
     return dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source
 
+def get_workspace_paths_with_config(base):
+    dir_workspace = base + os.sep
+    dir_data = dir_workspace + "data" + os.sep
+    dir_scanned = dir_workspace + "scanned" + os.sep
+    dir_generated = dir_workspace + "generated" + os.sep
+    dir_xls = dir_workspace + "results" + os.sep + "xls" + os.sep
+    dir_publish = dir_workspace + "results" + os.sep + "pdf" + os.sep
+    dir_source = dir_workspace + "source" + os.sep
+    dir_config = dir_workspace + "config" + os.sep
+    return dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source, dir_config
 
 def get_temp_paths(date, base):
     dir_scanner = base + os.sep + "__qrgrading__" + date + os.sep + "scanner" + os.sep

@@ -2,7 +2,9 @@ import argparse
 import os
 from datetime import date
 
-from qrgrader.common import get_workspace_paths
+import yaml
+
+from qrgrader.common import get_workspace_paths, get_workspace_paths_with_config
 
 import importlib.resources
 
@@ -18,6 +20,7 @@ def main():
     parser.add_argument('-c', '--create', help='Create workspace', action='store_true')
     parser.add_argument('-d', '--date', type=int, help='Date', default=today)
     args = parser.parse_args()
+
     if args.create:
         args = vars(parser.parse_args())
 
@@ -25,19 +28,24 @@ def main():
             print("Invalid date value, exiting.")
             exit(1)
 
-        directories = get_workspace_paths(os.getcwd() + os.sep + "qrgrading-" + str(args["date"]))
+        directories = get_workspace_paths_with_config(os.getcwd() + os.sep + "qrgrading-" + str(args["date"]))
 
+        print("wtf")
         for directory in directories:
             if not os.path.exists(directory):
                 os.makedirs(directory, exist_ok=True)
 
-        dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source = directories
+        dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source, dir_config = directories
 
         with open(dir_source + "main.tex", "w", encoding='utf-8') as f:
             f.write(get_resource("main.tex"))
 
         with open(dir_source + "qrgrader.sty", "w", encoding='utf-8') as f:
             f.write(get_resource("qrgrader.sty"))
+
+        config={"workbook": "none", "folder_id": "none"}
+        with open(dir_config + "config.yaml", "w", encoding='utf-8') as f:
+            yaml.dump(config, f)
 
         print(f"Workspace qrgrader-{args['date']} created successfully.")
 
