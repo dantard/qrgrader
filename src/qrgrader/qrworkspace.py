@@ -15,7 +15,7 @@ def get_resource(name):
 def main():
     parser = argparse.ArgumentParser()
     today = date.today().strftime("%y%m%d")
-    parser.add_argument('-c', '--create', type=int, help='Create workspace', action='store_true')
+    parser.add_argument('-c', '--create', help='Create workspace', action='store_true')
     parser.add_argument('-d', '--date', type=int, help='Date', default=today)
     args = parser.parse_args()
     if args.create:

@@ -14,18 +14,25 @@ Ejemplo de fila en el CSV:
 import smtplib
 import csv
 import os
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+
+import pandas
+
+from qrgrader.code import Code
+from qrgrader.code_set import CodeSet
+from qrgrader.common import StudentsData, Nia, get_workspace_paths, get_date
 
 # ──────────────────────────────────────────────
 # CONFIGURACIÓN — edita estos valores
 # ──────────────────────────────────────────────
 SMTP_SERVER   = "smtp.gmail.com"        # Gmail. Outlook: smtp.office365.com
 SMTP_PORT     = 587
-REMITENTE     = "tu_correo@gmail.com"
-CONTRASENA    = "ibadwgsoirmfvngs"  # Ver nota al final
+REMITENTE     = "xxxxxxxx"
+CONTRASENA    = "ibxadwygsoxirmfvyngs"  # Ver nota al final
 ASUNTO        = "Información importante sobre tu evaluación"
 CSV_FICHERO   = "alumnos.csv"           # Ruta a tu archivo CSV
 # ──────────────────────────────────────────────
@@ -54,17 +61,10 @@ def crear_correo(remitente, destinatario, asunto, cuerpo, ruta_adjunto=None):
     return msg
 
 
-def enviar_correos(csv_path):
+def enviar_correos(alumno):
     enviados  = 0
     fallidos  = 0
     errores   = []
-
-    # Leer CSV
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        alumnos = list(csv.DictReader(f))
-
-    total = len(alumnos)
-    print(f"📋 {total} alumnos cargados. Iniciando envío...\n")
 
     # Conectar al servidor SMTP una sola vez (más eficiente)
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as servidor:
@@ -72,36 +72,36 @@ def enviar_correos(csv_path):
         servidor.starttls()
         servidor.login(REMITENTE, CONTRASENA)
 
-        for i, alumno in enumerate(alumnos, start=1):
-            nombre   = alumno.get("nombre", "").strip()
-            email    = alumno.get("email", "").strip()
-            texto    = alumno.get("texto", "").strip()
-            adjunto  = alumno.get("fichero", "").strip()
+        nombre   = alumno.get("nombre", "").strip()
+        email    = alumno.get("email", "").strip()
+        texto    = alumno.get("texto", "").strip()
+        adjunto  = alumno.get("fichero", "").strip()
 
-            if not email:
-                print(f"  [{i}/{total}] ⚠️  Sin email para {nombre}, omitido.")
-                fallidos += 1
-                continue
+        try:
+            msg = crear_correo(REMITENTE, email, ASUNTO, texto, adjunto or None)
+            servidor.sendmail(REMITENTE, email, msg.as_string())
+            return True, None
+        except Exception as e:
+            return False, str(e)
 
-            try:
-                msg = crear_correo(REMITENTE, email, ASUNTO, texto, adjunto or None)
-                servidor.sendmail(REMITENTE, email, msg.as_string())
-                print(f"  [{i}/{total}] ✅ Enviado a {nombre} <{email}>")
-                enviados += 1
-            except Exception as e:
-                print(f"  [{i}/{total}] ❌ Error con {email}: {e}")
-                errores.append((email, str(e)))
-                fallidos += 1
 
-    # Resumen final
-    print(f"\n{'─'*45}")
-    print(f"✅ Enviados:  {enviados}")
-    print(f"❌ Fallidos:  {fallidos}")
-    if errores:
-        print("\nDetalle de errores:")
-        for em, err in errores:
-            print(f"  • {em}: {err}")
+def main():
+    dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source = get_workspace_paths(os.getcwd())
+    prefix = get_date() + "_"
+    df = pandas.read_csv(dir_xls + prefix + "raw.csv", sep='\t', header=0)
+    print(df.head())
 
+
+
+    '''
+    alumno = {"nombre": "Danilo", "email": "daniletto@gmail.com",
+              "texto": "Hola Danilo, tu nota es un 10..."}
+              #"fichero": "/home/danilo/T08B_informe_valoracion_tesis_doctoral.pdf"}
+    for i in range(300):
+        ok, msg = enviar_correos(alumno)
+        print(i, ok, msg)
+        time.sleep(1)
+    '''
 
 if __name__ == "__main__":
-    enviar_correos(CSV_FICHERO)
+    main()

@@ -37,6 +37,7 @@ setup(
             'qrworkspace=qrgrader.qrworkspace:main',
             'qrtable=qrgrader.qrtable:main',
             'qrsync=qrgrader.qrsync:main',
+            'qrsend=qrgrader.qrsender:main',
         ],
     },
     package_data={
