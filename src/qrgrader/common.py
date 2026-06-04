@@ -29,6 +29,25 @@ def get_workspace_paths_with_config(base):
     dir_config = dir_workspace + "config" + os.sep
     return dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source, dir_config
 
+def get_workspace_path(name):
+    dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source, dir_config = get_workspace_paths_with_config(os.getcwd())
+    if name == "config":
+        return dir_config
+    elif name == "data":
+        return dir_data
+    elif name == "scanned":
+        return dir_scanned
+    elif name == "generated":
+        return dir_generated
+    elif name == "xls":
+        return dir_xls
+    elif name == "publish":
+        return dir_publish
+    elif name == "source":
+        return dir_source
+    else:
+        raise Exception("Unknown workspace path name: {}".format(name))
+
 def get_temp_paths(date, base):
     dir_scanner = base + os.sep + "__qrgrading__" + date + os.sep + "scanner" + os.sep
     dir_generator = base + os.sep + "__qrgrading__" + date + os.sep + "generator" + os.sep

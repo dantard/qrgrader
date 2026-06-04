@@ -8,12 +8,14 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QEvent
 from PyQt5.QtGui import QDrag, QPixmap, QPainter
 from PyQt5.QtWidgets import (QListWidget,
                              QAbstractItemView, QListWidgetItem, QMenu, QMessageBox,
-                             QInputDialog, QColorDialog, QPushButton, QWidget, QVBoxLayout, QFrame)
-from qrgrader.common import get_date
+                             QInputDialog, QColorDialog, QPushButton, QWidget, QVBoxLayout, QFrame, QProgressDialog)
+from qrgrader.common import get_date, get_workspace_path
 
 from qrgrader.dialogs import ButtonEditDialog, RubricEditDialog
 from qrgrader.buttons import StepButton, Shortcut, Button, TextButton, StateButton, Separator, CutterButton, MultiplierButton
 from qrgrader.filter_dialog import FilterDialog
+import qrgrader.qrsheets as qrsheets
+from swik.utils import delayed
 
 
 class Rubric(QListWidget):
@@ -56,6 +58,10 @@ class Rubric(QListWidget):
         self.filter_btn.setStyleSheet("background-color: #F0A0A0")
         self.filter_btn.clicked.connect(self.toggle_filter)
 
+        self.upload_btn = QPushButton("Upload")
+        self.upload_btn.setStyleSheet("background-color: #00A0A0")
+        self.upload_btn.clicked.connect(self.upload_xls)
+
         # container = QWidget()
         # layout = QVBoxLayout(container)
         # layout.setContentsMargins(5, 5, 5, 0)  # margins you want
@@ -80,6 +86,27 @@ class Rubric(QListWidget):
 
     def get_filter_button(self):
         return self.filter_btn
+
+    def get_upload_button(self):
+        return self.upload_btn
+
+    def upload_xls(self):
+        folder = get_workspace_path("config")
+        with open(folder + os.sep + "config.yaml", "r", encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+            if config.get("workbook") in [None, "none"]:
+                QMessageBox().critical(self, "Error", "No workbook specified in config.yaml")
+                return
+            filename = os.path.basename(self.xls_filename)
+            self.pd = QProgressDialog("Uploading " + filename + " to Google Sheets...", "Cancel", 0, 0, self)
+            self.pd.setWindowModality(Qt.WindowModal)
+            self.pd.setMinimumDuration(0)
+            self.pd.show()
+            def delayed():
+                qrsheets.main(["--upload", filename, "--workbook", config.get("workbook"), "--yeah"])
+                self.pd.close()
+            QTimer.singleShot(100, delayed)
+
 
     def toggle_filter(self):
         if not self.filter_btn.isChecked():

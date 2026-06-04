@@ -7,7 +7,8 @@ import yaml
 
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet
-from qrgrader.common import check_workspace, get_workspace_paths, get_date, Password, Nia, get_prefix
+from qrgrader.common import check_workspace, get_workspace_paths, get_date, Password, Nia, get_prefix, \
+    get_workspace_paths_with_config
 from qrgrader.encrypt import decrypt
 from qrgrader.secret import get_secret
 from qrgrader.utils import makedir
@@ -23,7 +24,9 @@ client_secrets_json = '''
 '''
 
 
-def main():
+def main(params=None):
+
+
     parser = argparse.ArgumentParser(description='Upload and download sheets from Google Sheets')
     parser.add_argument('-d', '--download', help='Download sheet', action="append", default=[])
     parser.add_argument('-D', '--download-all', help='Download sheet', action="store_true")
@@ -39,13 +42,16 @@ def main():
     parser.add_argument('-w', '--workbook', help='Workbook name')
     parser.add_argument('-x', '--diff', help='Difference')
     parser.add_argument('-y', '--yeah', help="Answer 'yes' to all questions", action="store_true")
-    args = vars(parser.parse_args())
+    if params is None:
+        args = vars(parser.parse_args())
+    else:
+        args = vars(parser.parse_args(params))
 
     if not check_workspace():
         print("ERROR: qrsheets must be run from a workspace directory")
         sys.exit(1)
 
-    dir_workspace, dir_data, _, dir_generated, dir_xls, _, dir_source = get_workspace_paths(os.getcwd())
+    dir_workspace, dir_data, _, dir_generated, dir_xls, _, dir_source, dir_config = get_workspace_paths_with_config(os.getcwd())
     date = get_date()
 
     # Create json file with client secrets
@@ -162,7 +168,7 @@ def main():
             print("You cannot use both --download and --download-all")
             return
 
-        sh = Sheets(base_folder="results/xls", config_dir="config")
+        sh = Sheets(base_folder=dir_xls, config_dir=dir_config)
         sh.open(args_workbook)
 
         if args_upload_all:

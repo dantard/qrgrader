@@ -499,6 +499,7 @@ class MainWindow(QMainWindow):
             #helper.setContentsMargins(0, 0, 0, 0)
             #helper.layout().setContentsMargins(0, 0, 0, 0)
             helper.layout().addWidget(r1.get_filter_button())
+            helper.layout().addWidget(r1.get_upload_button())
             helper.layout().addWidget(r1)
             self.rubrics_tabs.addTab(helper, name)
             self.rubrics.append(r1)
