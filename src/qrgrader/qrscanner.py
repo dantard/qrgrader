@@ -7,8 +7,6 @@ from itertools import accumulate
 from multiprocessing import Manager, Pool, Process
 from random import randint
 
-from sympy.codegen.cfunctions import isnan
-
 import qrgrader.utils as utils
 import cv2
 import pandas as pd

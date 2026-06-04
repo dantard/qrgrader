@@ -3,6 +3,7 @@ import os
 import re
 import sys
 
+import pandas
 import yaml
 
 from qrgrader.code import Code
@@ -22,6 +23,7 @@ client_secrets_json = '''
 
 }
 '''
+
 
 
 def main(params=None):

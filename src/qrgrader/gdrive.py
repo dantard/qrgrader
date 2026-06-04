@@ -1,8 +1,11 @@
 import os
+import sys
 from datetime import datetime, timezone
 
 import gspread
+import pandas
 from gspread.utils import a1_to_rowcol, ValueInputOption
+from gspread_dataframe import set_with_dataframe
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 from pathlib import Path
@@ -16,16 +19,25 @@ FOLDER_MIME = "application/vnd.google-apps.folder"
 class GDrive:
 
     def __init__(self, config_dir=".", **kwargs):
-        self.stats = {"downloaded": [], "uploaded": [], "conflict": [],
-                      "skipped_files": [], "skipped_dir": [], "excluded": []}
+        self.reset_stats()
         self.gdrive = None
         self.config_dir = config_dir
+        self.verbose = kwargs.get("verbose", False)
 
         if kwargs.get("authorize", True):
             self.authorize()
 
+    def print(self, message):
+        if self.verbose:
+            print(message)
+
     def reset_stats(self):
-        self.stats = {"downloaded": [], "uploaded": [], "skipped_files": [], "skipped_dir": [], "excluded": []}
+        self.stats = {"downloaded": [],
+                      "uploaded": [],
+                      "skipped": [],
+                      "excluded": [],
+                      "conflict": [],
+                      "up_to_date": []}
 
 
     def authorize(self):
@@ -104,20 +116,24 @@ class GDrive:
             online_mtime = datetime.fromisoformat(online_mtime.replace('Z', '+00:00'))
 
             if drive_md5 == local_md5:
-                self.stats["skipped_files"].append(name)
+                self.stats["up_to_date"].append(name)
+                self.print(" - Skipping file {} (already up to date)".format(name))
                 os.utime(filename, (online_mtime.timestamp(), online_mtime.timestamp()))
             elif local_mtime > online_mtime :
                 file = self.gdrive.CreateFile({'id': online_files[0]['id']})
                 file.SetContentFile(filename)
                 file.Upload()
                 self.stats["uploaded"].append(name)
+                self.print(" - Updating file {} (local version is newer)".format(name))
             else:
                 self.stats["conflict"].append(name)
+                self.print(" - Conflict for file {} (remote version is newer)".format(name))
         else:
             file = self.gdrive.CreateFile({'title': name, 'parents': [{'id': folder_id}]})
             file.SetContentFile(filename)
             file.Upload()
             self.stats["uploaded"].append(name)
+            self.print(" - Uploading file {} (new file)".format(name))
             file_id = file.get('id')
 
         return file_id
@@ -135,14 +151,13 @@ class GDrive:
         file = self.gdrive.CreateFile({'id': folder_id})
         file.Delete()
 
-    def upload_directory(self, local_dir: str, parent_id="root", exclude=None, overwrite=False, is_root=True):
+    def upload_directory(self, local_dir: str, parent_id="root", exclude=None, overwrite=False, is_root=True, include=None):
         local_dir = Path(local_dir)
         if is_root:
             if overwrite:
                 query = f"title = '{local_dir.name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and '{parent_id}' in parents"
                 existing = self.gdrive.ListFile({'q': query}).GetList()
                 if existing:
-                    #print(f"Deleting existing '{local_dir.name}/'...")
                     self.delete_folder(existing[0]['id'])
                 folder_id = self.create_folder(local_dir.name, parent_id)
             else:
@@ -150,37 +165,38 @@ class GDrive:
                 existing = self.gdrive.ListFile({'q': query}).GetList()
                 if existing:
                     folder_id = existing[0]['id']
-                    #print(f"Entering {local_dir.name}/ (existing)")
                 else:
                     folder_id = self.create_folder(local_dir.name, parent_id)
-                    #print(f"Entering {local_dir.name}/")
         else:
             folder_id = parent_id
 
-        exclude = exclude or []
-        #print(f"Entering {local_dir.name}/")
+        if include is None:
+            self.print("Entering directory {}".format(local_dir))
+
+        exclude = exclude or {}
 
         for entry in sorted(local_dir.iterdir()):
             if entry.is_dir():
-                if entry.name in exclude:
-                    #print(f"Skipping directory {entry.name}/")
-                    self.stats["skipped_dir"].append(entry.name)
+                if entry.name in exclude.get("folders", []):
+                    self.stats["skipped"].append(str(entry))
+                    self.print(f" - Skipping directory {entry} (excluded)")
                     continue
-                self.upload_directory(entry, parent_id=folder_id, exclude=exclude)
+                self.upload_directory(entry, parent_id=folder_id, exclude=exclude, include=include)
             elif entry.is_file():
-                if entry.name in exclude:
-                    self.stats["excluded"].append(entry.name)
+                if entry.name in exclude.get("files", []):
+                    self.stats["skipped"].append(str(entry))
+                    self.print(f" - Skipping file {entry} (excluded)")
+                    continue
+                if include is not None and str(entry) not in include:
                     continue
                 self.upload_file(str(entry), folder_id)
-                print(f"Uploaded {len(self.stats['uploaded'])}, Skipped {len(self.stats['skipped_files'])}, "
-                      f"Conflict {len(self.stats['conflict'])} Processing: {str(entry)}                                        ", end="\r")
 
         return folder_id
-    def update_download(self, folder_id: str, dest: str):
-        self.download_directory(folder_id, dest, is_root=False)
+    def update_download(self, folder_id: str, dest: str, excluded=None):
+        self.download_directory(folder_id, dest, is_root=False, excluded=excluded)
 
-    def update_upload(self, folder_id: str, local_dir: str, exclude=None, overwrite=False):
-        self.upload_directory(local_dir, parent_id=folder_id, is_root=False, exclude=exclude, overwrite=overwrite)
+    def update_upload(self, folder_id: str, local_dir: str, exclude=None, overwrite=False, include=None):
+        self.upload_directory(local_dir, parent_id=folder_id, is_root=False, exclude=exclude, overwrite=overwrite, include=include)
 
     def download_file(self, file_id, local_path: Path):
         f = self.gdrive.CreateFile({'id': file_id})
@@ -195,17 +211,21 @@ class GDrive:
             local_md5 = utils.md5(local_path)
             if local_md5 == drive_md5:
                 os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
-                self.stats["skipped_files"].append(local_path.name)
+                self.stats["up_to_date"].append(local_path.name)
+                self.print(" - Skipping file {} (already up to date)".format(local_path.name))
             elif online_mtime > local_mtime:
                 f.GetContentFile(str(local_path))
                 os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
                 self.stats["downloaded"].append(local_path.name)
+                self.print(" - Updating file {} (remote version is newer)".format(local_path.name))
             else:
                 self.stats["conflict"].append(local_path.name)
+                self.print(" - Conflict for file {} (local version is newer)".format(local_path.name))
         else:
             f.GetContentFile(str(local_path))
             os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
             self.stats["downloaded"].append(local_path.name)
+            self.print(" - Downloading file {} (new file)".format(local_path.name))
 
         return file_id
 
@@ -213,7 +233,15 @@ class GDrive:
 
 
 
-    def download_directory(self, folder_id: str, dest: str, is_root=True):
+    def download_directory(self, folder_id: str, dest: str, is_root=True, excluded=None):
+
+
+        excluded = excluded or {}
+        for value in excluded.get("folders", []):
+            if value in str(dest):
+                print(f"Skipping directory {dest} (excluded)")
+                return
+
         dest = Path(dest)
 
         if is_root:
@@ -221,7 +249,10 @@ class GDrive:
             meta.FetchMetadata(fields="title")
             dest = dest / meta['title']
 
+        self.print("Entering directory {}".format(dest))
+
         dest.mkdir(parents=True, exist_ok=True)
+
 
         entries = self.gdrive.ListFile(
             {'q': f"'{folder_id}' in parents and trashed=false"}
@@ -231,14 +262,22 @@ class GDrive:
             local_path = dest / entry['title']
 
             if entry['mimeType'] == FOLDER_MIME:
-                # print(f"Entering {local_path}")
-                self.download_directory(entry['id'], local_path, is_root=False)
+                self.download_directory(entry['id'], local_path, is_root=False, excluded=excluded)
             else:
-                # print(f"Downloading {entry['title']}")
-                self.download_file(entry['id'], local_path)
-                print(f"Downloaded {len(self.stats['downloaded'])}, Skipped {len(self.stats['skipped_files'])}, "
-                      f"Conflict {len(self.stats['conflict'])}, Processing {local_path}                          ", end="\r")
+                skipped = False
+                for file in excluded.get("files", []):
+                    if file in str(local_path):
+                        skipped = True
+                        break
 
+                if skipped:
+                    self.stats["skipped"].append(str(local_path))
+                    self.print(f" - Skipping file {entry['title']} (excluded)")
+                else:
+                    self.download_file(entry['id'], local_path)
+
+
+        return dest
 
 class Sheets:
 
@@ -303,19 +342,22 @@ class Sheets:
             else:
                 new_ws = self.wb.add_worksheet(title, row, col)
 
-            if len(csv_file.split(".")) == 1:
-                csv_file += ".csv"
+            # if len(csv_file.split(".")) == 1:
+            #     csv_file += ".csv"
+            #
+            # with open(csv_file, "r", encoding='utf-8') as f:
+            #     data = f.readlines()
+            #     data = [line.strip().split(sep) for line in data]
+            #
+            #     for row in data:
+            #         for i in range(len(row)):
+            #             row[i] = get_narrowest_type(row[i])
+            #
+            # # print("Uploading sheet {}".format(title))
+            # new_ws.update(data, corner, value_input_option=ValueInputOption.user_entered)
+            df = pandas.read_csv(csv_file, sep=sep, header=None)
+            set_with_dataframe(new_ws, df, include_index=False, include_column_header=False, resize=True, allow_formulas=True)
 
-            with open(csv_file, "r", encoding='utf-8') as f:
-                data = f.readlines()
-                data = [line.strip().split(sep) for line in data]
-
-                for row in data:
-                    for i in range(len(row)):
-                        row[i] = get_narrowest_type(row[i])
-
-            # print("Uploading sheet {}".format(title))
-            new_ws.update(data, corner, value_input_option=ValueInputOption.user_entered)
 
     def download(self, args_sheet, args_yes=False):
         self._download(args_sheet, self.base_folder, args_yes)
@@ -371,3 +413,5 @@ class Sheets:
                     print("Local:  ", str(data[i]).replace("'", ""))
                     print("Remote: ", str(ws_data[i]).replace("'", ""))
                     print("")
+
+

@@ -381,14 +381,14 @@ class Rubric(QListWidget):
                 row += "\t" + button_name
             f.write(row + "\n")
 
-            row = "\tWeight"
+            row = ">\tWeight"
             for button_name, button_config in filtered.items():
                 row += "\t" + f"{button_config.get('weight', 1)}"
 
             f.write(row + "\n")
 
             # SCORES
-            row = "\tValue"
+            row = ">\tValue"
             for button_name, button_config in filtered.items():
                 if button_config.get("type") == 'button':
                     row += "\t" + "{:.2f}".format(button_config.get("full_value", 1))
@@ -455,15 +455,16 @@ class Rubric(QListWidget):
                     if button_state is not None:
                         if button_type == 'button':
                             value = button_state.get("value")
-                            value = " " if value == -1 else round(value / 100, 2)
+                            value = "" if value == -1 else round(value / 100, 2)
                         elif button_type == 'text':
                             value = button_state.get("text")
                         else:
                             value = button_state.get("value")
                     else:
-                        value = " "
+                        value = ""
 
-                    row += "\t {:4s}".format(str(value))
+                    #row += "\t {:4s}".format(str(value))
+                    row += "\t" + str(value)
 
                 f.write(row + "\n")
 

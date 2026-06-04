@@ -83,21 +83,21 @@ class Questions:
 
     def load(self):
         if os.path.exists(self.filename):
-            self.questions = pandas.read_csv(self.filename, sep='\t', header=0)
+            self.questions = pandas.read_csv(self.filename, sep='\t', header=0, index_col=0)
             return True
         return False
 
     def get_text(self, question):
-        return self.questions.loc[question - 1, "BRIEF"]
+        return self.questions.loc[question, "BRIEF"]
 
     def get_value(self, question, answer):
-        return self.questions.loc[question - 1, chr(answer + 64)]
+        return self.questions.loc[question, chr(answer + 64)]
 
     def get_type(self, question):
-        return self.questions.loc[question - 1, "TYPE"]
+        return self.questions.loc[question, "TYPE"]
 
     def get_questions(self):
-        return self.questions.iloc[:, 0].tolist()
+        return self.questions.index.tolist()
 
 
 class Generated(CodeSet):
