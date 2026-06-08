@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 import gspread
 import pandas
+from colorama import Fore, Style
 from gspread.utils import a1_to_rowcol, ValueInputOption
 from gspread_dataframe import set_with_dataframe
 from pydrive2.auth import GoogleAuth
@@ -23,13 +24,14 @@ class GDrive:
         self.gdrive = None
         self.config_dir = config_dir
         self.verbose = kwargs.get("verbose", False)
+        self.dry_run = kwargs.get("dry_run", False)
 
         if kwargs.get("authorize", True):
             self.authorize()
 
     def print(self, message):
         if self.verbose:
-            print(message)
+            print(message + Style.RESET_ALL)
 
     def reset_stats(self):
         self.stats = {"downloaded": [],
@@ -108,6 +110,7 @@ class GDrive:
         local_mtime = Path(filename).stat().st_mtime
         local_mtime = datetime.fromtimestamp(local_mtime, tz=timezone.utc)
 
+        file_id = None
         if online_files:
             file_info = online_files[0]
             file_id = file_info.get('id')
@@ -116,29 +119,35 @@ class GDrive:
             online_mtime = datetime.fromisoformat(online_mtime.replace('Z', '+00:00'))
 
             if drive_md5 == local_md5:
+                if not self.dry_run:
+                    os.utime(filename, (online_mtime.timestamp(), online_mtime.timestamp()))
                 self.stats["up_to_date"].append(name)
                 self.print(" - Skipping file {} (already up to date)".format(name))
-                os.utime(filename, (online_mtime.timestamp(), online_mtime.timestamp()))
             elif local_mtime > online_mtime :
-                file = self.gdrive.CreateFile({'id': online_files[0]['id']})
-                file.SetContentFile(filename)
-                file.Upload()
+                if not self.dry_run:
+                    file = self.gdrive.CreateFile({'id': online_files[0]['id']})
+                    file.SetContentFile(filename)
+                    file.Upload()
                 self.stats["uploaded"].append(name)
-                self.print(" - Updating file {} (local version is newer)".format(name))
+                self.print(Fore.GREEN + " - Updating file {} (local version is newer)".format(name))
             else:
                 self.stats["conflict"].append(name)
-                self.print(" - Conflict for file {} (remote version is newer)".format(name))
+                self.print(Fore.RED + " - Conflict for file {} (remote version is newer)".format(name))
         else:
-            file = self.gdrive.CreateFile({'title': name, 'parents': [{'id': folder_id}]})
-            file.SetContentFile(filename)
-            file.Upload()
+            if not self.dry_run:
+                file = self.gdrive.CreateFile({'title': name, 'parents': [{'id': folder_id}]})
+                file.SetContentFile(filename)
+                file.Upload()
+                file_id = file.get('id')
             self.stats["uploaded"].append(name)
-            self.print(" - Uploading file {} (new file)".format(name))
-            file_id = file.get('id')
+            self.print(Fore.GREEN + " - Uploading file {} (new file)".format(name))
+
 
         return file_id
 
     def create_folder(self, name, parent_id="root"):
+        if self.dry_run:
+            return None
         folder = self.gdrive.CreateFile({
             "title": name,
             "mimeType": "application/vnd.google-apps.folder",
@@ -148,8 +157,9 @@ class GDrive:
         return folder["id"]
 
     def delete_folder(self, folder_id):
-        file = self.gdrive.CreateFile({'id': folder_id})
-        file.Delete()
+        if not self.dry_run:
+            file = self.gdrive.CreateFile({'id': folder_id})
+            file.Delete()
 
     def upload_directory(self, local_dir: str, parent_id="root", exclude=None, overwrite=False, is_root=True, include=None):
         local_dir = Path(local_dir)
@@ -179,7 +189,7 @@ class GDrive:
             if entry.is_dir():
                 if entry.name in exclude.get("folders", []):
                     self.stats["skipped"].append(str(entry))
-                    self.print(f" - Skipping directory {entry} (excluded)")
+                    self.print(Fore.YELLOW + f" - Skipping directory {entry} (excluded)")
                     continue
                 self.upload_directory(entry, parent_id=folder_id, exclude=exclude, include=include)
             elif entry.is_file():
@@ -210,32 +220,29 @@ class GDrive:
             local_mtime = datetime.fromtimestamp(local_mtime, tz=timezone.utc)
             local_md5 = utils.md5(local_path)
             if local_md5 == drive_md5:
-                os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
+                if not self.dry_run:
+                    os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
                 self.stats["up_to_date"].append(local_path.name)
                 self.print(" - Skipping file {} (already up to date)".format(local_path.name))
             elif online_mtime > local_mtime:
-                f.GetContentFile(str(local_path))
-                os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
+                if not self.dry_run:
+                    f.GetContentFile(str(local_path))
+                    os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
                 self.stats["downloaded"].append(local_path.name)
-                self.print(" - Updating file {} (remote version is newer)".format(local_path.name))
+                self.print(Fore.GREEN + " - Updating file {} (remote version is newer)".format(local_path.name))
             else:
                 self.stats["conflict"].append(local_path.name)
-                self.print(" - Conflict for file {} (local version is newer)".format(local_path.name))
+                self.print(Fore.RED + " - Conflict for file {} (local version is newer)".format(local_path.name))
         else:
-            f.GetContentFile(str(local_path))
-            os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
+            if not self.dry_run:
+                f.GetContentFile(str(local_path))
+                os.utime(local_path, (online_mtime.timestamp(), online_mtime.timestamp()))
             self.stats["downloaded"].append(local_path.name)
-            self.print(" - Downloading file {} (new file)".format(local_path.name))
+            self.print(Fore.GREEN + " - Downloading file {} (new file)".format(local_path.name))
 
         return file_id
 
-
-
-
-
     def download_directory(self, folder_id: str, dest: str, is_root=True, excluded=None):
-
-
         excluded = excluded or {}
         for value in excluded.get("folders", []):
             if value in str(dest):
@@ -272,12 +279,30 @@ class GDrive:
 
                 if skipped:
                     self.stats["skipped"].append(str(local_path))
-                    self.print(f" - Skipping file {entry['title']} (excluded)")
+                    self.print(Fore.YELLOW + f" - Skipping file {entry['title']} (excluded)")
                 else:
                     self.download_file(entry['id'], local_path)
 
 
         return dest
+
+    def get_current_user(self):
+        """
+        Retrieves the name and email address of the currently authenticated user.
+        """
+        if not self.gdrive:
+            self.print("Drive instance not initialized or authenticated.")
+            return None
+
+        try:
+            # Query Google Drive API for account metadata
+            about = self.gdrive.GetAbout()
+            user_info = about.get('user', {})
+            return user_info.get("displayName"), user_info.get("emailAddress")
+
+        except Exception as e:
+            self.print(f"Error retrieving user info: {e}")
+            return None, None
 
 class Sheets:
 

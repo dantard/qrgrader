@@ -31,14 +31,12 @@ from qrgrader.common import StudentsData, Nia, get_workspace_paths, get_date
 # ──────────────────────────────────────────────
 SMTP_SERVER   = "smtp.gmail.com"        # Gmail. Outlook: smtp.office365.com
 SMTP_PORT     = 587
-REMITENTE     = "xxxxxxxx"
-CONTRASENA    = "ibxadwygsoxirmfvyngs"  # Ver nota al final
-ASUNTO        = "Información importante sobre tu evaluación"
-CSV_FICHERO   = "alumnos.csv"           # Ruta a tu archivo CSV
+REMITENTE     = "dantard@unizar.es"
+CONTRASENA    = "ibadwgsoirmfvngs"  # Ver nota al final
 # ──────────────────────────────────────────────
 
 
-def crear_correo(remitente, destinatario, asunto, cuerpo, ruta_adjunto=None):
+def crear_correo(remitente, destinatario, asunto, cuerpo, ruta_adjuntos=None):
     """Construye el mensaje MIME con texto y adjunto opcional."""
     msg = MIMEMultipart()
     msg["From"]    = remitente
@@ -46,17 +44,18 @@ def crear_correo(remitente, destinatario, asunto, cuerpo, ruta_adjunto=None):
     msg["Subject"] = asunto
 
     msg.attach(MIMEText(cuerpo, "plain", "utf-8"))
-
-    if ruta_adjunto and os.path.isfile(ruta_adjunto):
-        with open(ruta_adjunto, "rb") as f:
-            parte = MIMEBase("application", "octet-stream")
-            parte.set_payload(f.read())
-        encoders.encode_base64(parte)
-        nombre_fichero = os.path.basename(ruta_adjunto)
-        parte.add_header("Content-Disposition", f'attachment; filename="{nombre_fichero}"')
-        msg.attach(parte)
-    elif ruta_adjunto:
-        print(f"  ⚠️  Adjunto no encontrado: {ruta_adjunto}")
+    ruta_adjuntos = ruta_adjuntos or []
+    for ruta_adjunto in ruta_adjuntos:
+        if ruta_adjunto and os.path.isfile(ruta_adjunto):
+            with open(ruta_adjunto, "rb") as f:
+                parte = MIMEBase("application", "octet-stream")
+                parte.set_payload(f.read())
+            encoders.encode_base64(parte)
+            nombre_fichero = os.path.basename(ruta_adjunto)
+            parte.add_header("Content-Disposition", f'attachment; filename="{nombre_fichero}"')
+            msg.attach(parte)
+        elif ruta_adjunto:
+            print(f"  ⚠️  Adjunto no encontrado: {ruta_adjunto}")
 
     return msg
 
@@ -72,13 +71,13 @@ def enviar_correos(alumno):
         servidor.starttls()
         servidor.login(REMITENTE, CONTRASENA)
 
-        nombre   = alumno.get("nombre", "").strip()
         email    = alumno.get("email", "").strip()
         texto    = alumno.get("texto", "").strip()
-        adjunto  = alumno.get("fichero", "").strip()
+        adjuntos  = alumno.get("ficheros", [])
+        asunto   = alumno.get("asunto", "").strip()
 
         try:
-            msg = crear_correo(REMITENTE, email, ASUNTO, texto, adjunto or None)
+            msg = crear_correo(REMITENTE, email, asunto, texto, adjuntos or None)
             servidor.sendmail(REMITENTE, email, msg.as_string())
             return True, None
         except Exception as e:
@@ -88,8 +87,30 @@ def enviar_correos(alumno):
 def main():
     dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source = get_workspace_paths(os.getcwd())
     prefix = get_date() + "_"
-    df = pandas.read_csv(dir_xls + prefix + "raw.csv", sep='\t', header=0)
-    print(df.head())
+    df = pandas.read_csv(dir_xls + prefix + "table.csv", sep='\t', header=0)
+    df = df.iloc[4:,0:5]
+    df.columns = ["uid", "id", "nia", "name", "group"]
+    exams = df.loc[:, "uid"].tolist()
+
+    for index, row in df.iterrows():
+        name = row["name"].strip()
+        apellido, nombre = name.split(",")
+        row["nia"] = "dantard"
+        alumno = {"email": f"{row['nia']}@unizar.es",
+                  "asunto": "Su examen de primera convocatoria escaneado",
+                  "texto": f"Estimado/a CC/DC {apellido},\nen el adjunto encontrará su examen escaneado.\n\nReciba un cordial saludo.",
+                  "ficheros": [f"{dir_publish}{row['uid']}.pdf"]
+                  }
+        ok, msg = enviar_correos(alumno)
+        if ok:
+            exams.remove(row["uid"])
+            print(f"Enviado a {row['nia']} ({row['name']})")
+        else:
+            print(f"Error al enviar a {row['nia']} ({row['name']}): {msg}")
+
+        time.sleep(1)
+
+    print("Exámenes sin enviar:", exams)
 
 
 

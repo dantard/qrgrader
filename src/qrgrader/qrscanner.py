@@ -388,15 +388,11 @@ def main():
         raw.loc[3, 2:] = ans_value
         raw.loc[4, 2:] = ans_perc
 
-
-
         # sort the index and reset it to be sure that the
         # exams are in the right order and the header is on top
         df = raw.sort_index()
 
-
-
-        # TABLE IS READY WITH UPPER FORMULA
+        # TABLE IS READY WITH UPPER FORMULAS
 
         # Insert the formulas for the open questions
         if num_open > 0:

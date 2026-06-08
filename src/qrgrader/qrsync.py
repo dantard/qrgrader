@@ -22,6 +22,7 @@ import argparse
 
 import yaml
 from attr.filters import exclude
+from pygments.lexer import include
 
 from qrgrader.gdrive import GDrive, Sheets
 from qrgrader.common import check_workspace, get_workspace_paths, get_date, get_workspace_paths_with_config
@@ -29,7 +30,7 @@ from qrgrader.utils import makedir
 from qrgrader.secret import get_secret
 from qrgrader.encrypt import decrypt
 
-def get_gdrive(verbose=False):
+def get_gdrive(verbose=False, dry_run=False):
     if not os.path.exists("config" + os.sep + "client_secret.json"):
         makedir("config")
         secret = get_secret()
@@ -42,7 +43,7 @@ def get_gdrive(verbose=False):
             print("Password incorrect. You may request a password to dantard@unizar.es", e)
             sys.exit(1)
 
-    return GDrive(config_dir="config", verbose=verbose)
+    return GDrive(config_dir="config", verbose=verbose, dry_run=dry_run)
 
 def upload_summary(drive):
     print(
@@ -69,7 +70,9 @@ def main():
     parser.add_argument("--commit", default=None, nargs="+",help="Upload specific files")
     parser.add_argument("--push", action="store_true", help="Update workspace")
     parser.add_argument("--pull", action="store_true", help="Update workspace")
+    parser.add_argument("--force", action="store_true", help="Force action for super user")
     parser.add_argument("-s", "--silent", action="store_true", help="Update workspace")
+    parser.add_argument("--dry", action="store_true", help="Execute a dry run without uploading or downloading files")
     args = parser.parse_args()
 
     excluded = {"files":["client_secret.json", "credentials.json"], "folders": []}
@@ -80,6 +83,7 @@ def main():
 
     if args.clone:
         drive = get_gdrive(not args.silent)
+        print("User: {}".format(drive.get_current_user()))
         created = drive.download_directory(args.folder_id, ".", excluded=excluded)
         dest_config_dir = str(created) + os.sep + "config" + os.sep
         os.makedirs(dest_config_dir, exist_ok=True)
@@ -94,32 +98,55 @@ def main():
        print("ERROR: qrsync must be run from a workspace directory unless cloning a workspace")
        sys.exit(1)
 
-
-
     dir_workspace, dir_data, _, dir_generated, dir_xls, _, dir_source, dir_config = get_workspace_paths_with_config(os.getcwd())
 
-    drive = get_gdrive(not args.silent)
+    drive = get_gdrive(not args.silent, args.dry)
     if os.path.exists(dir_config + "config.yaml"):
         with open(dir_config + "config.yaml", "r", encoding='utf-8') as f:
             config = yaml.safe_load(f)
     else:
-        config = {"workbook": "none", "folder_id": "none"}
+        config = {"workbook": "none", "folder_id": "none", "owners": {}}
+
+    name, email = drive.get_current_user()
+    owners = config.get("owners", {})
+    is_superuser = email == config.get("su") and args.force
+    has_wildcard = "*" in owners.get(email, [])
 
     if args.folder_id:
         config["folder_id"] = args.folder_id
 
     if args.upload:
+        # if the user is not in owners or does not have "*" permission,
+        # and is not the superuser with force flag, deny upload
+
+        if not (is_superuser or has_wildcard):
+            print(f"ERROR: User {email} does not have permission to upload this workspace.")
+            sys.exit(1)
+
         folder_id = drive.upload_directory(dir_workspace, parent_id=args.folder_id, exclude=excluded)
         config["folder_id"] = folder_id
         upload_summary(drive)
 
     elif args.push:
+        if is_superuser or has_wildcard:
+            included = None
+        elif email in owners:
+            included, excluded = [os.getcwd() + os.sep + path for path in owners.get(email, [])], None
+        else:
+            print(f"ERROR: User {email} does not have permission to upload this workspace.")
+            sys.exit(1)
+
         folder_id = args.folder_id or config.get("folder_id", None)
-        drive.update_upload(folder_id, dir_workspace, exclude=excluded)
+        drive.update_upload(folder_id, dir_workspace, exclude=excluded, include=included)
         upload_summary(drive)
 
 
     elif args.pull:
+        if is_superuser or has_wildcard:
+            excluded = None
+        elif email in owners:
+            excluded = {"files":[os.getcwd() + os.sep + path for path in owners.get(email, [])]}
+
         folder_id = args.folder_id or config.get("folder_id", None)
         drive.update_download(folder_id, dir_workspace, excluded=excluded)
         download_summary(drive)
