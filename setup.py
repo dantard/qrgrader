@@ -38,7 +38,6 @@ setup(
             'qrgenerator=qrgrader.qrgenerator:main',
             'qrworkspace=qrgrader.qrworkspace:main',
             'qrtable=qrgrader.qrtable:main',
-            'qrsync=qrgrader.qrsync:main',
             'qrsend=qrgrader.qrsender:main',
         ],
     },

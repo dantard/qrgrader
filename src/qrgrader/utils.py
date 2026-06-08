@@ -8,6 +8,11 @@ import numpy as np
 import zxingcpp
 import hashlib
 import hashlib
+
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QProgressDialog
+
+
 def pix2np(pix):
     im = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
     im = np.ascontiguousarray(im[..., [2, 1, 0]])  # rgb to bgr
@@ -173,3 +178,37 @@ class SortedSet(list):
     def remove(self, value):
         if value in self:
             super().remove(value)
+
+def run_with_progress(parent, message, fn):
+    pd = QProgressDialog(message, None, 0, 0, parent)
+    pd.setWindowModality(Qt.WindowModal)
+    pd.setMinimumDuration(0)
+    pd.show()
+    def run():
+        try:
+            fn()
+        finally:
+            pd.close()
+    QTimer.singleShot(100, run)
+
+def get_pd(message, parent=None):
+    pd = QProgressDialog(message, None, 0, 0, parent)
+    pd.setWindowModality(Qt.WindowModal)
+    pd.setMinimumDuration(0)
+    pd.show()
+    return pd
+
+class Delayed(QProgressDialog):
+    def __init__(self, message, parent=None):
+        super().__init__(message, None, 0, 0, parent)
+        self.setWindowModality(Qt.WindowModal)
+        self.setMinimumDuration(0)
+        self.show()
+
+    def run(self, fn):
+        def run():
+            try:
+                fn()
+            finally:
+                self.close()
+        QTimer.singleShot(100, run)

@@ -8,7 +8,8 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QEvent
 from PyQt5.QtGui import QDrag, QPixmap, QPainter
 from PyQt5.QtWidgets import (QListWidget,
                              QAbstractItemView, QListWidgetItem, QMenu, QMessageBox,
-                             QInputDialog, QColorDialog, QPushButton, QWidget, QVBoxLayout, QFrame, QProgressDialog)
+                             QInputDialog, QColorDialog, QPushButton, QWidget, QVBoxLayout, QFrame, QProgressDialog,
+                             QApplication)
 from qrgrader.common import get_date, get_workspace_path
 
 from qrgrader.dialogs import ButtonEditDialog, RubricEditDialog
@@ -16,6 +17,9 @@ from qrgrader.buttons import StepButton, Shortcut, Button, TextButton, StateButt
 from qrgrader.filter_dialog import FilterDialog
 import qrgrader.qrsheets as qrsheets
 from swik.utils import delayed
+
+from qrgrader.gdrive import Sheets
+from qrgrader.utils import run_with_progress, get_pd
 
 
 class Rubric(QListWidget):
@@ -27,6 +31,7 @@ class Rubric(QListWidget):
     def __init__(self, schema_filename, dir_xls, **kwargs):
         super().__init__()
 
+        self.pd = None
         self.filters = None
         self.exam_id = None
         self.config = {}
@@ -90,6 +95,8 @@ class Rubric(QListWidget):
     def get_upload_button(self):
         return self.upload_btn
 
+    # A bit messy should use a worker thread but it works
+    # and I don't want to add more complexity right now
     def upload_xls(self):
         folder = get_workspace_path("config")
         with open(folder + os.sep + "config.yaml", "r", encoding='utf-8') as f:
@@ -97,15 +104,23 @@ class Rubric(QListWidget):
             if config.get("workbook") in [None, "none"]:
                 QMessageBox().critical(self, "Error", "No workbook specified in config.yaml")
                 return
-            filename = os.path.basename(self.xls_filename)
-            self.pd = QProgressDialog("Uploading " + filename + " to Google Sheets...", "Cancel", 0, 0, self)
-            self.pd.setWindowModality(Qt.WindowModal)
-            self.pd.setMinimumDuration(0)
-            self.pd.show()
-            def delayed():
-                qrsheets.main(["--upload", filename, "--workbook", config.get("workbook"), "--yeah"])
-                self.pd.close()
-            QTimer.singleShot(100, delayed)
+
+        sheet_name = str(os.path.basename(self.xls_filename).replace(".csv", ""))
+        sheet = Sheets(config_dir=folder, yes=True)
+
+        self.pd = get_pd("Checking...", self)
+        def check():
+            sheet.open(config.get("workbook"))
+            self.pd.close()
+
+            if sheet.worksheet_exists(sheet_name):
+                ret = QMessageBox().question(self, '', f"A sheet named '{sheet_name}' already exists in the workbook\nDo you want to overwrite it?", QMessageBox.Yes | QMessageBox.No)
+                if ret != QMessageBox.Yes:
+                    return
+
+            run_with_progress(self, "Uploading " + sheet_name + " to Google Sheets...", lambda: sheet.upload(self.xls_filename, sheet_name))
+
+        QTimer.singleShot(100, check)
 
 
     def toggle_filter(self):
@@ -381,14 +396,14 @@ class Rubric(QListWidget):
                 row += "\t" + button_name
             f.write(row + "\n")
 
-            row = ">\tWeight"
+            row = "\tWeight"
             for button_name, button_config in filtered.items():
                 row += "\t" + f"{button_config.get('weight', 1)}"
 
             f.write(row + "\n")
 
             # SCORES
-            row = ">\tValue"
+            row = "\tValue"
             for button_name, button_config in filtered.items():
                 if button_config.get("type") == 'button':
                     row += "\t" + "{:.2f}".format(button_config.get("full_value", 1))

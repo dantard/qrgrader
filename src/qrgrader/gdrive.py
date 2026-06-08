@@ -6,7 +6,7 @@ import gspread
 import pandas
 from colorama import Fore, Style
 from gspread.utils import a1_to_rowcol, ValueInputOption
-from gspread_dataframe import set_with_dataframe
+from gspread_dataframe import set_with_dataframe, get_as_dataframe
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 from pathlib import Path
@@ -307,12 +307,12 @@ class GDrive:
 class Sheets:
 
     def __init__(self, **kwargs):
-        self.base_folder = kwargs.get("base_folder", "../..")
-        self.config_dir = kwargs.get("config_dir", "../..")
         self.gc = None
         self.wb = None
-        self.woksheets = None
-        self.woksheets_names = None
+        self.worksheets = None
+        self.worksheets_names = None
+        self.arg_yes = kwargs.get("yes", False)
+        self.config_dir = kwargs.get("config_dir", ".")
         if kwargs.get("authorize", True):
             self.authorize()
 
@@ -320,123 +320,40 @@ class Sheets:
         self.gc = gspread.oauth(credentials_filename=self.config_dir + os.sep + "client_secret.json",
                                 authorized_user_filename=self.config_dir + os.sep + "token.json")
 
-    def open(self, args_workbook):
-        self.wb = self.gc.open(args_workbook)
-        self.woksheets = self.wb.worksheets()
-        self.woksheets_names = [sheet.title for sheet in self.woksheets]
+    def open(self, workbook):
+        self.wb = self.gc.open(workbook)
+        self.worksheets = self.wb.worksheets()
+        self.worksheets_names = [sheet.title for sheet in self.worksheets]
 
-    def set_base_folder(self, folder):
-        self.base_folder = folder
+    def worksheet_exists(self, sheet_name):
+        return sheet_name in self.worksheets_names
 
-    def upload_all(self, args_filter=None, args_yes=False):
-        csv_files = [self.base_folder + os.sep + f for f in os.listdir(self.base_folder) if f.endswith(".csv")]
+    def upload(self, csv_file, title, sep="\t"):
 
-        if args_filter is not None:
-            csv_files = [f for f in csv_files if args_filter in f]
-
-        self._upload(csv_files, args_yes=args_yes)
-
-    def upload(self, filename, args_yes=False):
-        self._upload([self.base_folder + os.sep + f for f in filename], args_yes)
-
-    def _upload(self, csv_files, args_yes=True, sep="\t"):
-
-        for csv_file in csv_files:
-
-            info = csv_file.split(":")
-            if len(info) == 2:
-                csv_file, corner = info
-            else:
-                csv_file, corner = info[0], "A1"
-
-            print("Uploading file {} at corner: {}".format(csv_file, corner))
-
-            title = str(os.path.basename(csv_file).replace(".csv", ""))
-
-            row, col = a1_to_rowcol(corner)
-
-            if title in self.woksheets_names:
-                if not args_yes:
-                    ok = input("Sheet {} already exists. Continue (Y/n)? ".format(title))
+            if title in self.worksheets_names:
+                if not self.arg_yes:
+                    ok = input("Sheet {} already exists. Continue (y/N)? ".format(title))
                     if ok.lower() != "y":
-                        continue
-                new_ws = self.wb.worksheet(title)
-                rows = max(new_ws.row_count, row)
-                cols = max(new_ws.col_count, col)
-                new_ws.resize(rows, cols)
+                        return
+                worksheet = self.wb.worksheet(title)
             else:
-                new_ws = self.wb.add_worksheet(title, row, col)
+                worksheet = self.wb.add_worksheet(title, 0, 0)
 
-            # if len(csv_file.split(".")) == 1:
-            #     csv_file += ".csv"
-            #
-            # with open(csv_file, "r", encoding='utf-8') as f:
-            #     data = f.readlines()
-            #     data = [line.strip().split(sep) for line in data]
-            #
-            #     for row in data:
-            #         for i in range(len(row)):
-            #             row[i] = get_narrowest_type(row[i])
-            #
-            # # print("Uploading sheet {}".format(title))
-            # new_ws.update(data, corner, value_input_option=ValueInputOption.user_entered)
             df = pandas.read_csv(csv_file, sep=sep, header=None)
-            set_with_dataframe(new_ws, df, include_index=False, include_column_header=False, resize=True, allow_formulas=True)
+            set_with_dataframe(worksheet, df, include_index=False, include_column_header=False, resize=True, allow_formulas=True)
+            self.worksheets_names = [sheet.title for sheet in self.wb.worksheets()]
 
 
-    def download(self, args_sheet, args_yes=False):
-        self._download(args_sheet, self.base_folder, args_yes)
 
-    def download_all(self, args_filter=None, args_yes=False):
-        # Download files
-        sheets_to_download = self.woksheets_names
-        if args_filter is not None:
-            sheets_to_download = [sheet for sheet in sheets_to_download if args_filter in sheet]
-        self._download(sheets_to_download, self.base_folder, args_yes)
+def download(self, sheet_name, dest_folder):
+        ws = self.wb.worksheet(sheet_name)
+        filename = dest_folder + os.sep + str(sheet_name + ".csv")
 
-    def _download(self, sheets_to_download, args_folder, args_yes=False):
-        for sheet in sheets_to_download:
-            ws = self.wb.worksheet(sheet)
-            filename = args_folder + os.sep + str(sheet + ".csv")
+        if os.path.exists(filename) and not self.arg_yes:
+            ok = input("File {} already exists. Overwrite (y/N)? ".format(filename))
+            if ok.lower() != "y":
+                return
+            get_as_dataframe(ws, evaluate_formulas=True).to_csv(filename, index=False, header=False)
 
-            if os.path.exists(filename) and not args_yes:
-                ok = input("File {} already exists. Overwrite (Y/n)? ".format(filename))
-                if ok.lower() != "y":
-                    continue
-            with open(filename, "w", encoding='utf-8') as f:
-                print("Downloading sheet {}".format(sheet))
-                data = ws.get_all_values()
-                for line in data:
-                    f.write(",".join(line) + "\n")
-
-    def diff(self, args_diff):
-        self._diff(args_diff, self.base_folder)
-
-    def _diff(self, args_diff, args_folder, sep="\t"):
-        if args_diff:
-            ws = self.wb.worksheet(args_diff)
-            ws_data = ws.get_all_values()
-
-            filename = args_folder + os.sep + str(args_diff + ".csv")
-            with open(filename, "r", encoding='utf-8') as f:
-                data = f.readlines()
-                data = [line.strip().split(sep) for line in data]
-
-            data_len = len(data)
-            ws_len = len(ws_data)
-
-            if data_len != ws_len:
-                print("Data have different number of rows")
-                print("Local:  ", data_len)
-                print("Remote: ", ws_len)
-
-            min_length = min(data_len, ws_len)
-
-            for i in range(min_length):
-                if data[i] != ws_data[i]:
-                    print("Row {}:".format(i))
-                    print("Local:  ", str(data[i]).replace("'", ""))
-                    print("Remote: ", str(ws_data[i]).replace("'", ""))
-                    print("")
 
 
