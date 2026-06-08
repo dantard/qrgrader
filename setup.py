@@ -15,7 +15,9 @@ setup(
         'opencv-python-headless',
         'pandas',
         'swikv4-minimal >= 0.0.5',
-        'pyqtgraph'
+        'pyqtgraph',
+        'colorama',
+        'pyyaml'
     ],
     author='Danilo Tardioli',
     author_email='dantard@unizar.es',
