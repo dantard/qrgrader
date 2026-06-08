@@ -192,3 +192,13 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+    # elif args.create:
+    #     excluded = ["client_secret.json", "credentials.json"]
+    #     folder_id = drive.upload_directory(dir_workspace, parent_id=args.folder_id, exclude=excluded)
+    #
+    #     config["folder_id"] = folder_id
+    #
+    #     with open(dir_config + "config.yaml", "w", encoding='utf-8') as f:
+    #         yaml.dump(config, f)
