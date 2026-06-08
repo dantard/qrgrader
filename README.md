@@ -92,13 +92,14 @@ a directory tree called `qrgrading-DDDDDD` with the following structure:
 ```
 
 qrgrading-250212
+├── config
 ├── data
 ├── source
 ├── generated
 ├── scanned
 ├── results
-├── xls
-├── pdf
+    ├── xls
+    ├── pdf
 
 ```
 
@@ -107,7 +108,7 @@ qrgrading-250212
 To create a new workspace, run the following command in a terminal:
 
 ```bash
-$ qrworkspace -d 250312
+$ qrworkspace -c -d 250312
 Workspace 'qrgrader-250312' created successfully.
 ```
 
@@ -239,10 +240,10 @@ $ qrscanner -p
 qrscanner -p 
 Processing file 250327001.pdf
 Processing file 250327002.pdf
-Processed /home/danilo/work/qrgrader/qrgrader-250327/scanned/250327001.pdf page 1 
-Processed /home/danilo/work/qrgrader/qrgrader-250327/scanned/250327002.pdf page 1 
-Processed /home/danilo/work/qrgrader/qrgrader-250327/scanned/250327001.pdf page 0 
-Processed /home/danilo/work/qrgrader/qrgrader-250327/scanned/250327002.pdf page 0 
+Processed /home/danilo/work/qrgrader/qrgrader-250327/scanned/250327001.pdf
+Processed /home/danilo/work/qrgrader/qrgrader-250327/scanned/250327002.pdf 
+Processed /home/danilo/work/qrgrader/qrgrader-250327/scanned/250327001.pdf 
+Processed /home/danilo/work/qrgrader/qrgrader-250327/scanned/250327002.pdf 
 Reconstructing exams
 All done :)
 ```
@@ -263,8 +264,7 @@ Sometimes, students mark an answer, and later they want to modify that answer.
 Since it is impossible to erase the QR code, in these cases they are instructed to mark  
 also the chosen answer and write "NO" beside the answer they want to erase.
 It will result in a question with two marked answers that can be easily identified.
-To facilitate the grading of these cases, we created a graphical user interface that allows to
-unmark the answer that has been marked by mistake.
+To facilitate the grading of these cases, we created a graphical user interface that allows unmarking the answer that has been marked by mistake.
 To use the graphical user interface, run the following command from within the workspace directory
 
 ```bash
@@ -276,7 +276,7 @@ The graphical user interface will open as follows:
 
 On the left side the exam number is shown, and the PDF file is displayed on the right side.
 The marked answers are shown in green and red. When a question has two marks,
-both answers are shown in yellow. Double-clicking on the answer will unmark it.
+both answers are shown in yellow. Double-clicking on the answer will unmark it and show the change in cyan.
 
 
 ### Postprocessing and annotating the exams
