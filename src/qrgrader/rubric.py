@@ -16,7 +16,6 @@ from qrgrader.dialogs import ButtonEditDialog, RubricEditDialog
 from qrgrader.buttons import StepButton, Shortcut, Button, TextButton, StateButton, Separator, CutterButton, MultiplierButton
 from qrgrader.filter_dialog import FilterDialog
 import qrgrader.qrsheets as qrsheets
-from swik.utils import delayed
 
 from qrgrader.gdrive import Sheets
 from qrgrader.utils import run_with_progress, get_pd

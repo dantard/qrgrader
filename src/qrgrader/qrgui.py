@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import QMainWindow, QHBoxLayout, QWidget, QTreeWidgetItem, 
     QTabWidget, QLabel, QVBoxLayout, \
     QSizePolicy, QFormLayout, QCheckBox, QGroupBox
 from easyconfig2.easyconfig import EasyConfig2
-from scipy.stats import norm
 from swikv4.pages.swik_page import SwikPage
 
 from qrgrader.dialogs import ControlDialog, NameListDialog

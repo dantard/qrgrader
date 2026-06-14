@@ -91,20 +91,19 @@ def main():
     df = df.iloc[4:,0:5]
     df.columns = ["uid", "id", "nia", "name", "group"]
     exams = df.loc[:, "uid"].tolist()
-
+    row1, col = df.shape
     for index, row in df.iterrows():
         name = row["name"].strip()
         apellido, nombre = name.split(",")
-        row["nia"] = "dantard"
         alumno = {"email": f"{row['nia']}@unizar.es",
-                  "asunto": "Su examen de primera convocatoria escaneado",
+                  "asunto": "[FINF] Su examen de primera convocatoria escaneado",
                   "texto": f"Estimado/a CC/DC {apellido},\nen el adjunto encontrará su examen escaneado.\n\nReciba un cordial saludo.",
                   "ficheros": [f"{dir_publish}{row['uid']}.pdf"]
                   }
         ok, msg = enviar_correos(alumno)
         if ok:
             exams.remove(row["uid"])
-            print(f"Enviado a {row['nia']} ({row['name']})")
+            print(f"Enviado a {row['nia']} ({row['name']}) ({index+1}/{row1})")
         else:
             print(f"Error al enviar a {row['nia']} ({row['name']}): {msg}")
 

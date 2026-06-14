@@ -17,7 +17,8 @@ setup(
         'swikv4-minimal >= 0.0.5',
         'pyqtgraph',
         'colorama',
-        'pyyaml'
+        'pyyaml',
+        'gspread_dataframe'
     ],
     author='Danilo Tardioli',
     author_email='dantard@unizar.es',
