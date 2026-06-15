@@ -484,6 +484,8 @@ class MainWindow(QMainWindow):
 
     def load_schemas(self):
         for filename in self.rubrics_files:
+            print("fukenameo", filename)
+
             name = os.path.basename(filename).replace(".scm", "")
             r1 = Rubric(filename, self.dir_xls, buttons_height=self.cfg_buttons_height.get(),
                         buttons_font=self.cfg_buttons_font.get())
@@ -544,7 +546,8 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(100, delayed)
 
     def update_scores_layout(self):
-
+        # TODO
+        return
         total = 0
         quiz_score, full_score = self.get_quiz_score(self.current_exam)
         if full_score != 0:
@@ -906,14 +909,14 @@ def main():
 
         filename = schema.replace(".scm", "") + ".scm"
 
-        if not os.path.exists(filename):
-            if args["create"]:
-                print("Creating schema", filename)
-                with open(filename, "w", encoding='utf-8') as f:
-                    f.write("{}\n")
-            else:
-                print(f"ERROR: schema {filename} not found")
-                sys.exit(1)
+        # if not os.path.exists(filename):
+        #     if args["create"]:
+        #         print("Creating schema", filename)
+        #         with open(filename, "w", encoding='utf-8') as f:
+        #             f.write("{}\n")
+        #     else:
+        #         print(f"ERROR: schema {filename} not found")
+        #         sys.exit(1)
         filenames.append(filename)
 
     main = MainWindow(filenames, args)

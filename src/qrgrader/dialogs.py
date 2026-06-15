@@ -13,7 +13,6 @@ class ButtonEditDialog(QDialog):
     def __init__(self, draggable_list, button=None, existing_names=None):
         super().__init__()
 
-        schema = button.get_config() if button is not None else {}
         self.existing_names = existing_names if existing_names is not None else []
 
         if button is not None and button.get_name() in self.existing_names:
@@ -33,7 +32,7 @@ class ButtonEditDialog(QDialog):
 
         self.combo = QComboBox()
         self.combo.addItems(['button', 'multiplier', 'cutter', 'text', 'separator'])
-        self.combo.setCurrentText(schema.get('type', 'button'))
+
         self.layout.addWidget(WidgetsRow("Type", self.combo))
 
         self.le = QLineEdit()
@@ -47,48 +46,57 @@ class ButtonEditDialog(QDialog):
         self.value.setDecimals(1)
         self.value.setMinimum(-20)
         self.value.setMaximum(20)
-        self.value.setValue(float(schema.get('full_value', 1)))
         self.value.setSingleStep(0.5)
         self.value.valueChanged.connect(self.spin_value_changed)  # type: ignore
-
-        # self.fill_cb(schema.get("type", 'button'), schema.get('value', 1))
         self.layout.addWidget(WidgetsRow("Value", self.value))
 
         self.steps = QSpinBox()
         self.steps.setMinimum(0)
         self.steps.setMaximum(10)
-        self.steps.setValue(int(schema.get('steps', 0)))
+
         self.layout.addWidget(WidgetsRow("Steps", self.steps))
         #
         self.percent = QSpinBox()
         self.percent.setMinimum(0)
         self.percent.setMaximum(100)
-        self.percent.setValue(int(schema.get('percent', 1) * 100))
         self.layout.addWidget(WidgetsRow("Percent", self.percent))
         #
         self.weight = QDoubleSpinBox()
         self.weight.setDecimals(2)
         self.weight.setMinimum(-20)
         self.weight.setMaximum(20)
-        self.weight.setValue(float(schema.get('weight', 1)))
         self.weight.setSingleStep(0.5)
         self.layout.addWidget(WidgetsRow("Weight", self.weight))
 
         self.click_next_cb = QCheckBox("Next on click")
-        self.click_next_cb.setChecked(schema.get('click_next', False))
         self.layout.addWidget(self.click_next_cb)
 
         # Show the current color and a color picker button
-        self.color = QColor(schema.get('color', "#D4D4D4"))
+        self.color = "#D4D4D4"
         self.colorButton = QPushButton('Choose color')
         self.colorButton.clicked.connect(self.pick_color)  # type: ignore
         self.layout.addWidget(WidgetsRow('Color', self.colorButton))
-        self.colorButton.setStyleSheet(f'background-color: {schema.get("color", "#D4D4D4")}')
 
         self.layout.addWidget(self.buttonBox)
         self.combo.currentTextChanged.connect(self.cb_changed)  # type: ignore
 
+
+        if button is not None:
+            self.combo.setCurrentText(button.get_type())
+            self.color = QColor(button.get_color())
+            if button.get_type() in ['multiplier', 'cutter']:
+                self.percent.setValue(int(button.get_percent() * 100))
+            if button.get_type() in ['button']:
+                self.steps.setValue(int(button.get_steps()))
+                self.weight.setValue(float(button.get_weight()))
+                self.click_next_cb.setChecked(button.get_click_next())
+
+            self.value.setValue(float(button.get_full_value()))
+            self.colorButton.setStyleSheet(f'background-color: {button.get_color()}')
+
         self.enable_widgets()
+
+
 
     def check_valid_name(self, text):
         ok = self.le.text() != "" and self.le.text() not in self.existing_names
@@ -115,7 +123,7 @@ class ButtonEditDialog(QDialog):
         self.layout.widgets['Steps'].setVisible(b)
         self.layout.widgets['Weight'].setVisible(b)
         self.layout.widgets['Color'].setVisible(bmc)
-        self.layout.widgets['Percent'].setVisible(mc)
+        #self.layout.widgets['Percent'].setVisible(mc)
         self.click_next_cb.setVisible(b)
 
         self.adjustSize()
@@ -132,7 +140,7 @@ class ButtonEditDialog(QDialog):
     def get(self):
         res = {'type': self.combo.currentText()}
         if self.combo.currentText() in ['button', 'multiplier', 'cutter']:
-            res['color'] = self.color.name()
+            res['color'] = self.color
         if self.combo.currentText() in ['multiplier', 'cutter']:
             res['percent'] = float(self.percent.value() / 100.0)
         if self.combo.currentText() in ['button']:

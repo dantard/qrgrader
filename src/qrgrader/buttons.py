@@ -22,12 +22,25 @@ class ThirdButton(QPushButton):
 
 
 class Button(QWidget):
-    def __init__(self, name):
+    def __init__(self, name, **kwargs):
         super().__init__()
         self.name = name
+        self.color = kwargs.get("color", "#D4D4D4")
+        self.set_color(self.color)
+        self.type = "button"
 
     def get_name(self):
         return self.name
+
+    def set_color(self, color):
+        self.color = color
+        self.setStyleSheet('background-color:' + color)
+
+    def get_type(self):
+        return self.type
+
+    def get_color(self):
+        return self.color
 
 class Shortcut(Button):
     clicked = pyqtSignal()
@@ -37,21 +50,14 @@ class Shortcut(Button):
         self.button = QPushButton(name)
         self.button.clicked.connect(self.clicked.emit)  # type: ignore
         self.buttons = kwargs.get("buttons", [])
-        self.set_color(kwargs.get("color", "#FF0000"))
         self.setLayout(QHBoxLayout())
         self.layout().addWidget(self.button)
         font = self.button.font()
         font.setItalic(True)
         self.button.setFont(font)
 
-    def set_color(self, color):
-        self.setStyleSheet('background-color:' + color)
-
     def get_buttons(self):
         return self.buttons
-
-    def get_config(self):
-        return {"type": "shortcut", "buttons": self.buttons, "color": self.styleSheet().split(":")[1]}
 
 
 
@@ -64,9 +70,9 @@ class Separator(Button):
         self.label.setAlignment(Qt.AlignCenter)
         self.layout().addWidget(self.label)
         self.layout().setContentsMargins(5, 5, 5, 5)
+        self.type = "separator"
 
-    def get_config(self):
-        return {"type": "separator"}
+
 
 
 class StateButton(Button):
@@ -85,15 +91,19 @@ class TextButton(StateButton):
         self.layout().addWidget(QLabel(name))
         self.layout().addWidget(self.button)
         self.layout().setContentsMargins(5, 2, 5, 2)
+        self.type = "text"
 
-    def get_config(self):
-        return {"type": "text"}
+    def get_value(self):
+        return self.button.toPlainText()
 
-    def get_state(self):
-        return {"text": self.button.toPlainText().replace("\n",";")}
+    def get_xls_value(self):
+        return self.button.toPlainText().replace("\n", ";")
 
-    def set_state(self, state):
-        self.button.setText(state.get("text", "").replace(";","\n"))
+    def set_value(self, value):
+        self.button.setText(value)
+
+    def set_xls_value(self, value):
+        self.button.setText(value.replace(";","\n"))
 
 class PushButton(StateButton):
 
@@ -119,7 +129,6 @@ class StepButton(PushButton):
         self.weight = kwargs.get('weight', 1)
         self.full_value = kwargs.get('full_value', 1)
         self.n_steps = kwargs.get('steps', 0)
-        color = kwargs.get("color", "#D4D4D4")
         self.click_next = kwargs.get("click_next", False)
 
         self.comment = None
@@ -128,13 +137,12 @@ class StepButton(PushButton):
         layout = QHBoxLayout()
         layout.setContentsMargins(5, 2, 5, 2)
 
-        if color is not None:
-            self.button.setStyleSheet('background-color: {}'.format(color))
         self.button.clicked.connect(self.clicked)
         self.spinner = QSpinBox()
 
         if kwargs.get("height") is not None:
             self.spinner.setMinimumHeight(kwargs.get("height"))
+
         if kwargs.get("font") is not None:
             font = self.button.font()
             font.setPixelSize(int(kwargs.get("font")))
@@ -156,7 +164,6 @@ class StepButton(PushButton):
         self.comment_lbl.setMaximumWidth(10)
         self.comment_lbl.setVisible(False)
 
-        self.set_comment(kwargs.get('comment', ""))
         self.start_with = kwargs.get('start_with', 100)
 
         if self.n_steps > 0:
@@ -164,16 +171,11 @@ class StepButton(PushButton):
 
         self.setLayout(layout)
 
+    def get_steps(self):
+        return self.n_steps
+
     def get_weight(self):
         return self.weight
-
-    def get_color(self):
-        return self.button.styleSheet().split(":")[1].strip()
-
-    def get_config(self):
-        return {"type": "button", "steps": self.n_steps, "weight": self.weight, "full_value": self.full_value,
-                "color": self.get_color(), "comment": self.comment, "start_with": self.start_with,
-                "click_next": self.click_next}
 
     def toggle_show_points(self):
         self.points_lb.setVisible(not self.points_lb.isVisible())
@@ -181,7 +183,7 @@ class StepButton(PushButton):
     def is_checked(self):
         return self.button.isChecked()
 
-    def get_state(self):
+    def get_value(self):
         if self.is_checked():
             if self.n_steps == 0:
                 value = 100
@@ -190,7 +192,11 @@ class StepButton(PushButton):
         else:
             value = -1
 
-        return {"value": value, "comment": self.comment}
+        return value
+
+    def get_xls_value(self):
+        value = self.get_value()
+        return "" if value == -1 else str(value)
 
     def clicked(self):
         self.spinner.blockSignals(True)
@@ -209,10 +215,7 @@ class StepButton(PushButton):
 
         self.score_changed.emit()  # type: ignore
 
-    def set_state(self, state):
-        self.set_comment(state.get("comment", ""))
-        value = state.get("value", -1)
-
+    def set_value(self, value):
         self.button.blockSignals(True)
         self.button.setChecked(value >= 0 if self.n_steps > 0 else value > 0)
         self.button.blockSignals(False)
@@ -229,16 +232,11 @@ class StepButton(PushButton):
 
         self.score_changed.emit()  # type: ignore
 
-    def set_comment(self, text):
-        self.comment_lbl.setVisible(text != "")
-        self.setToolTip(text)
-        self.comment = text
-
-    def get_comment(self):
-        return self.comment
-
-    def clear_comment(self):
-        self.set_comment("")
+    def set_xls_value(self, value):
+        if value == "":
+            self.set_value(-1)
+        else:
+            self.set_value(int(value))
 
     def get_full_value(self):
         return self.full_value
@@ -250,7 +248,6 @@ class StepButton(PushButton):
         return self.click_next and self.button.isChecked()
 
 
-
 class PercentButton(PushButton):
     score_changed = pyqtSignal()
 
@@ -258,42 +255,36 @@ class PercentButton(PushButton):
         super().__init__(name, **kwargs)
 
         self.percent = kwargs.get('percent', 1)
-        color = kwargs.get("color", "#D4D4D4")
         self.setLayout(QHBoxLayout())
         self.layout().setContentsMargins(5, 2, 5, 2)
-        self.button.setStyleSheet('background-color: {}'.format(color))
         self.button.clicked.connect(self.score_changed.emit)
         self.layout().addWidget(self.button)
+        self.type = "percent"
 
-    def get_config(self):
-        return {"percent": self.percent, "color": self.get_color()}
+    def get_value(self):
+        return 1 if self.button.isChecked() else 0
 
-    def get_state(self):
-        return {"value": 1 if self.button.isChecked() else 0}
-
-    def set_state(self, state):
-        self.button.setChecked(state.get("value", 0) == 1)
-
-    def get_color(self):
-        return self.button.styleSheet().split(":")[1].strip()
+    def get_xls_value(self):
+        return str(self.get_value())
 
     def get_percent(self):
         return self.percent
 
-    def get_click_next(self):
-        return False
+    def set_value(self, state):
+        self.button.setChecked(state == 1)
+
+    def set_xls_value(self, value):
+        self.set_value(int(value))
+
 
 class MultiplierButton(PercentButton):
 
-    def get_config(self):
-        config = super().get_config()
-        config["type"] = "multiplier"
-        return config
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+        self.type = "multiplier"
 
 
 class CutterButton(PercentButton):
-
-    def get_config(self):
-        config = super().get_config()
-        config["type"] = "cutter"
-        return config
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+        self.type = "cutter"

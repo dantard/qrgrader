@@ -3,6 +3,7 @@ import csv
 import os
 
 import gspread.utils
+import pandas
 import yaml
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QEvent
 from PyQt5.QtGui import QDrag, QPixmap, QPainter
@@ -10,6 +11,9 @@ from PyQt5.QtWidgets import (QListWidget,
                              QAbstractItemView, QListWidgetItem, QMenu, QMessageBox,
                              QInputDialog, QColorDialog, QPushButton, QWidget, QVBoxLayout, QFrame, QProgressDialog,
                              QApplication)
+from cffi.cffi_opcode import PRIM_INT8
+from gspread.utils import a1_to_rowcol, rowcol_to_a1
+
 from qrgrader.common import get_date, get_workspace_path
 
 from qrgrader.dialogs import ButtonEditDialog, RubricEditDialog
@@ -27,20 +31,18 @@ class Rubric(QListWidget):
     button_or_value_changed = pyqtSignal()
     filtered = pyqtSignal()
 
-    def __init__(self, schema_filename, dir_xls, **kwargs):
+    def __init__(self, name, dir_xls, **kwargs):
         super().__init__()
 
         self.pd = None
         self.filters = None
         self.exam_id = None
         self.config = {}
-        self.scores = {}
-        self.schema_dictionary = {}
-        self.schema_filename = schema_filename
-        self.name = self.schema_filename.split(".")[0]
-        self.scores_filename = self.name + ".yaml"
+        self.name = name
+        self.table = pandas.DataFrame()
+        self.table.columns = []
 
-        self.xls_filename = dir_xls + get_date() + "_" + self.name + ".csv"
+        self.table_filename = dir_xls + get_date() + "_" + self.name + ".csv"
         self.current_exam_id = None
         self.modified = False
         self.buttons_height = kwargs.get("buttons_height")
@@ -65,28 +67,9 @@ class Rubric(QListWidget):
         self.upload_btn = QPushButton("Upload")
         self.upload_btn.setStyleSheet("background-color: #00A0A0")
         self.upload_btn.clicked.connect(self.upload_xls)
-
-        # container = QWidget()
-        # layout = QVBoxLayout(container)
-        # layout.setContentsMargins(5, 5, 5, 0)  # margins you want
-        # layout.addWidget(self.filter_btn)
-        # item = QListWidgetItem()
-        # self.addItem(item)
-        # item.setSizeHint(container.sizeHint())
-        # self.setItemWidget(item, container)
-
-        # line = QFrame()
-        # line.setFrameShape(QFrame.HLine)
-        # line.setFrameShadow(QFrame.Sunken)
-        # item = QListWidgetItem()
-        # item.setFlags(Qt.NoItemFlags)  # optional: makes it non-selectable
-        # item.setSizeHint(line.sizeHint())
-        # self.addItem(item)
-        # self.setItemWidget(item, line)
-
-
-        self.populate()
-        self.load_scores()
+        print("jjj")
+        #self.populate()
+        self.load_table()
 
     def get_filter_button(self):
         return self.filter_btn
@@ -104,7 +87,7 @@ class Rubric(QListWidget):
                 QMessageBox().critical(self, "Error", "No workbook specified in config.yaml")
                 return
 
-        sheet_name = str(os.path.basename(self.xls_filename).replace(".csv", ""))
+        sheet_name = str(os.path.basename(self.table_filename).replace(".csv", ""))
         sheet = Sheets(config_dir=folder, yes=True)
 
         self.pd = get_pd("Checking...", self)
@@ -117,7 +100,7 @@ class Rubric(QListWidget):
                 if ret != QMessageBox.Yes:
                     return
 
-            run_with_progress(self, "Uploading " + sheet_name + " to Google Sheets...", lambda: sheet.upload(self.xls_filename, sheet_name))
+            run_with_progress(self, "Uploading " + sheet_name + " to Google Sheets...", lambda: sheet.upload(self.table_filename, sheet_name))
 
         QTimer.singleShot(100, check)
 
@@ -153,10 +136,39 @@ class Rubric(QListWidget):
             ok = ok and button_score.get("value", -1) == v.get("value")
         return ok
 
-    def load_scores(self):
-        if os.path.exists(self.scores_filename):
-            with open(self.scores_filename) as file:
-                self.scores = yaml.safe_load(file)
+    def load_table(self):
+        if os.path.exists(self.table_filename):
+            self.table = pandas.read_csv(self.table_filename, sep="\t", header=0, index_col=0)
+            self.table = self.table.fillna("")
+            self.table.index = self.table.index.astype(str)
+
+            for name in self.table.columns:
+                kind = self.table.loc["type", name]
+                color = self.table.loc["color", name]
+                if kind == 'button':
+                    weight = float(self.table.loc["weight", name])
+                    full = float(self.table.loc["full", name])
+                    steps = float(self.table.loc["steps", name])
+                    button = StepButton(name, weight=weight, full_value=full, steps=steps, color=color)
+                    button.score_changed.connect(self.button_clicked)
+                elif kind == 'text':
+                    button = TextButton(name)
+                elif kind == 'cutter':
+                    button = CutterButton(name)
+                    button.score_changed.connect(self.button_clicked)
+                elif kind == 'multiplier':
+                    button = MultiplierButton(name)
+                    button.score_changed.connect(self.button_clicked)
+                elif kind == 'separator':
+                    button = Separator(name)
+                else:
+                    button = None
+
+                if button is not None:
+                    item = QListWidgetItem()
+                    self.addItem(item)
+                    self.setItemWidget(item, button)
+                    item.setSizeHint(button.sizeHint())
 
     def push(self, exam_id):
         if exam_id is not None:
@@ -184,57 +196,54 @@ class Rubric(QListWidget):
         else:
             super().keyPressEvent(e)
 
-    def populate(self):
-        if os.path.exists(self.schema_filename):
-            # Load schema
-            with open(self.schema_filename, newline='') as csvfile:
-                content = yaml.full_load(csvfile)
-
-                self.config = content.get("config", {})
-                self.schema_dictionary = content.get("buttons", {})
-
-                # Create lateral panel and buttons
-                for button_name in self.schema_dictionary:
-                    button_config = self.schema_dictionary[button_name]
-                    button_config["height"] = self.buttons_height
-                    button_config["font"] = self.buttons_font
-
-                    if button_config.get("type") == 'button':
-                        button = StepButton(button_name, **button_config)
-                        button.score_changed.connect(self.button_clicked)  # type: ignore
-                    elif button_config.get("type") == 'text':
-                        button = TextButton(button_name, **button_config)
-                    elif button_config.get("type") == 'cutter':
-                        button = CutterButton(button_name, **button_config)
-                        button.score_changed.connect(self.button_clicked)
-                    elif button_config.get("type") == 'multiplier':
-                        button = MultiplierButton(button_name, **button_config)
-                        button.score_changed.connect(self.button_clicked)
-                    elif button_config.get("type") == 'shortcut':
-                        button = Shortcut(button_name, **button_config)
-                        button.clicked.connect(self.shortcut_activated)
-                    elif button_config.get("type") == 'separator':
-                        button = Separator(button_name, **button_config)
-                    else:
-                        button = None
-
-                    if button is not None:
-                        # Create Item in ListWidget
-                        item = QListWidgetItem()
-                        self.addItem(item)
-                        self.setItemWidget(item, button)
-                        item.setSizeHint(button.sizeHint())
+    # def populate(self):
+    #     if os.path.exists(self.schema_filename):
+    #         # Load schema
+    #         with open(self.schema_filename, newline='') as csvfile:
+    #             content = yaml.full_load(csvfile)
+    #
+    #             self.config = content.get("config", {})
+    #             self.schema_dictionary = content.get("buttons", {})
+    #
+    #             # Create lateral panel and buttons
+    #             for button_name in self.schema_dictionary:
+    #                 button_config = self.schema_dictionary[button_name]
+    #                 button_config["height"] = self.buttons_height
+    #                 button_config["font"] = self.buttons_font
+    #
+    #                 if button_config.get("type") == 'button':
+    #                     button = StepButton(button_name, **button_config)
+    #                     button.score_changed.connect(self.button_clicked)  # type: ignore
+    #                 elif button_config.get("type") == 'text':
+    #                     button = TextButton(button_name, **button_config)
+    #                 elif button_config.get("type") == 'cutter':
+    #                     button = CutterButton(button_name, **button_config)
+    #                     button.score_changed.connect(self.button_clicked)
+    #                 elif button_config.get("type") == 'multiplier':
+    #                     button = MultiplierButton(button_name, **button_config)
+    #                     button.score_changed.connect(self.button_clicked)
+    #                 elif button_config.get("type") == 'shortcut':
+    #                     button = Shortcut(button_name, **button_config)
+    #                     button.clicked.connect(self.shortcut_activated)
+    #                 elif button_config.get("type") == 'separator':
+    #                     button = Separator(button_name, **button_config)
+    #                 else:
+    #                     button = None
+    #
+    #                 if button is not None:
+    #                     # Create Item in ListWidget
+    #                     item = QListWidgetItem()
+    #                     self.addItem(item)
+    #                     self.setItemWidget(item, button)
+    #                     item.setSizeHint(button.sizeHint())
 
     def save_schema(self):
-        buttons = {}
+        df = pandas.DataFrame()
         for b in self.filter_buttons(Button):
-            buttons[b.get_name()] = b.get_config()
+            df[b.get_name()] = self.table[b.get_name()]
+        self.table = df
 
-        self.schema_dictionary = buttons
 
-        with open(self.schema_filename, "w", encoding='utf-8') as f:
-            schema = {"buttons": buttons, "config": self.config}
-            yaml.dump(schema, f, sort_keys=False)
 
     def button_clicked(self):
         self.store(self.exam_id)
@@ -256,12 +265,27 @@ class Rubric(QListWidget):
 
         self.setItemWidget(item, button)
         item.setSizeHint(button.sizeHint())
-        self.save_schema()
+
+        self.table[button.get_name()] = ""
+        self.table.loc["type", button.get_name()] = button.get_type()
+        self.table.loc["color", button.get_name()] = button.get_color()
+        if button.get_type() == 'button':
+            self.table.loc["steps", button.get_name()] = button.get_steps()
+            self.table.loc["full", button.get_name()] = button.get_full_value()
+            self.table.loc["weight", button.get_name()] = button.get_weight()
+        else:
+            self.table.loc["steps", button.get_name()] = ""
+            self.table.loc["full", button.get_name()] = ""
+            self.table.loc["weight", button.get_name()] = ""
+
+
         self.button_or_value_changed.emit()
+
+        print(self.table)
 
     def get_dialog(self, button=None):
 
-        dialog = ButtonEditDialog(self, button, [name for name in self.schema_dictionary])
+        dialog = ButtonEditDialog(self, button, None)
 
         if not dialog.exec():
             return None
@@ -273,7 +297,7 @@ class Rubric(QListWidget):
         #     return self.get_dialog(button)
 
 
-        self.schema_dictionary[name] = config
+#        self.schema_dictionary[name] = config
 
         if kind == 'button':
             button = StepButton(name, **config)
@@ -305,13 +329,19 @@ class Rubric(QListWidget):
 
         self.setItemWidget(item, button)
 
-        # Rename the key in the dictionary
-        if prev_name is not None:
-            for exam_id in self.scores:
-                if prev_name in self.scores[exam_id].keys():
-                    self.scores[exam_id][button.get_name()] = self.scores[exam_id].pop(prev_name)
+        # rename the column
+        if prev_name != button.get_name():
+            self.table.rename(columns={prev_name: button.get_name()}, inplace=True)
 
-        self.save_schema()
+        if button.get_type() == 'button':
+            self.table.loc["type", button.get_name()] = button.get_type()
+            self.table.loc["full", button.get_name()] = button.get_full_value()
+            self.table.loc["weight", button.get_name()] = button.get_weight()
+            self.table.loc["color", button.get_name()] = button.get_color()
+            self.table.loc["steps", button.get_name()] = button.get_steps()
+
+        print(self.table)
+
         self.button_or_value_changed.emit()
 
     def button_list_right_click(self, pos):
@@ -338,14 +368,17 @@ class Rubric(QListWidget):
         self.clearFocus()
 
     def compute_score(self, exam_id):
-        this_exam_data = self.scores.get(int(exam_id), {})
-
         total = 0
         points = 0
         text = "="
+        exam_id = str(exam_id)
+
+        if self.table is None or exam_id not in self.table.index:
+            return 0, self.config.get("weight", 10)
+
         for button in self.filter_buttons(StepButton):
-            this_button_data = this_exam_data.get(button.get_name(), {})
-            value = this_button_data.get("value", 0)
+            value = self.table.loc[exam_id, button.get_name()]
+            value = 0 if value == "" else float(value)
             if value >= 0:
                 value = value * button.get_full_value() / 100.0
                 text = text + 'N("' + button.get_name() + '")+' + str(value) + ' + '
@@ -353,7 +386,7 @@ class Rubric(QListWidget):
 
             total = total + button.get_full_value() * button.get_weight()
         text += "0"
-        #print(text)
+
         cut = 1
         for button in self.filter_buttons(CutterButton):
             cut = min(cut, button.get_percent())
@@ -375,14 +408,14 @@ class Rubric(QListWidget):
         self.setAttribute(Qt.WA_TransparentForMouseEvents, value)
 
     def save_scores(self):
-        with open(self.scores_filename, "w", encoding='utf-8') as file:
-            yaml.dump(self.scores, file)
-
-        self.save_xls()
+        with open(self.table_filename, "w", encoding='utf-8') as f:
+            self.table.to_csv(f, sep="\t", index=True)
+        print("Saved scores to", self.table_filename)
+        return
 
     def save_xls(self):
 
-        with open(self.xls_filename, "w", encoding='utf-8') as f:
+        with open(self.table_filename, "w", encoding='utf-8') as f:
             filtered = {
                 name: config
                 for name, config in self.schema_dictionary.items()
@@ -593,38 +626,61 @@ class Rubric(QListWidget):
     #
     def store(self, exam_id):
         assessed = False
+        exam_id = str(exam_id)
 
-        # Remove previous scores for this exam_if in case
-        # the exam_id has been "uncorrected"
-        self.scores.pop(exam_id, None)
-        for b in self.filter_buttons(StateButton):  # type: Score
-            state = b.get_state()
+        self.table.loc[exam_id, :] = ""
 
-            # Only store if a button has been pressed or there is some text
-            if (state.get("value", -1) != -1 or
-                    state.get("text", "") != "" or
-                    state.get("percent", -1) != -1):
+        for button in self.filter_buttons(StateButton):  # type: Score
+            value = button.get_xls_value()
+            self.table.loc[exam_id, button.get_name()] = value
+            assessed  = assessed or value != ""
 
-                if self.scores.get(exam_id) is None:
-                    self.scores[exam_id] = {}
-                self.scores[exam_id][b.get_name()] = state
-                assessed = True
+        if not assessed:
+            self.table.drop(exam_id, inplace=True, errors='ignore')
+
+        df = self.table
+        idx = df.columns.get_indexer(df.columns[df.loc["type"] == "button"])
+
+        denom = "/sumif({0"
+        for col in idx:
+            denom += "," + rowcol_to_a1(5, col + 2)
+        denom += '}, ">0")'
+
+        for row, exam_id in enumerate(self.table.index.tolist()):
+
+            if row > 4:
+                print(row, exam_id)
+                numer = "=(0"
+                for col in idx:
+                    numer += "+" + rowcol_to_a1(row + 2, col + 2) + "*" + rowcol_to_a1(5, col + 2)
+                numer += ")"
+                self.table.loc[exam_id, "SCORE"] = numer + denom
+                print(exam_id, numer + denom)
+
+        self.table.to_csv(self.table_filename, sep="\t", index=True)
         return assessed
 
+
     def assessed(self, exam_id):
-        return self.scores.get(exam_id) is not None
-
-
+        exam_id = str(exam_id)
+        return exam_id in self.table.index
 
     def retrieve(self, exam_id):
-        self.current_exam_id = exam_id
-        rubric_data = self.scores.get(exam_id, {})
+        print(self.table)
 
-        if rubric_data is not None:
+        self.current_exam_id = exam_id
+        exam_id = str(exam_id)
+        for button in self.filter_buttons(StateButton):
+            button.blockSignals(True)
+            button.set_xls_value("")
+            button.blockSignals(False)
+
+        if self.table is not None and exam_id in self.table.index:
             for button in self.filter_buttons(StateButton):  # type: Score
-                button.blockSignals(True)
-                button.set_state(rubric_data.get(button.get_name(), {}))
-                button.blockSignals(False)
+                if button.get_name() in self.table.columns:
+                    button.blockSignals(True)
+                    button.set_xls_value(self.table.loc[exam_id, button.get_name()])
+                    button.blockSignals(False)
 
     def startDrag(self, ev):
         selected = self.selectedIndexes()[0].row()
