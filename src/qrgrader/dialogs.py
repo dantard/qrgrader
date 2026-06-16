@@ -83,7 +83,7 @@ class ButtonEditDialog(QDialog):
 
         if button is not None:
             self.combo.setCurrentText(button.get_type())
-            self.color = QColor(button.get_color())
+            self.color = button.get_color()
             if button.get_type() in ['multiplier', 'cutter']:
                 self.percent.setValue(int(button.get_percent() * 100))
             if button.get_type() in ['button']:
@@ -131,11 +131,11 @@ class ButtonEditDialog(QDialog):
     def pick_color(self, button):
         color = QtWidgets.QColorDialog.getColor()
         if color.isValid():
-            self.color = color
-            self.colorButton.setStyleSheet(f'background-color: {color.name()}')
+            self.color = color.name()
+            self.colorButton.setStyleSheet(f'background-color: {self.color}')
 
     def get_stylesheet(self):
-        return f'background-color: {self.color.name()}'
+        return f'background-color: {self.color}'
 
     def get(self):
         res = {'type': self.combo.currentText()}

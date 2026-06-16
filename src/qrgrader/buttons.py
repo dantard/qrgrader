@@ -26,15 +26,13 @@ class Button(QWidget):
         super().__init__()
         self.name = name
         self.color = kwargs.get("color", "#D4D4D4")
-        self.set_color(self.color)
         self.type = "button"
 
     def get_name(self):
         return self.name
 
     def set_color(self, color):
-        self.color = color
-        self.setStyleSheet('background-color:' + color)
+        pass
 
     def get_type(self):
         return self.type
@@ -74,9 +72,9 @@ class Separator(Button):
 
 
 
-
 class StateButton(Button):
-    pass
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
 
 
 class TextButton(StateButton):
@@ -108,7 +106,7 @@ class TextButton(StateButton):
 class PushButton(StateButton):
 
     def __init__(self,name, **kwargs):
-        super().__init__(name)
+        super().__init__(name, **kwargs)
         self.button = ThirdButton(name)
         self.button.setMinimumWidth(10)
         self.button.setCheckable(True)
@@ -119,6 +117,11 @@ class PushButton(StateButton):
             font = self.button.font()
             font.setPixelSize(int(kwargs.get("font")))
             self.button.setFont(font)
+        self.set_color(self.color)
+
+    def set_color(self, color):
+        self.color = color
+        self.button.setStyleSheet(f'background-color: {color}')
 
 class StepButton(PushButton):
     score_changed = pyqtSignal()
