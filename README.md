@@ -23,6 +23,7 @@
     - [Third step: grading the exams](#third-step-grading-the-exams)
     - [Fourth step: check the results](#fourth-step-check-the-results)
     - [Fifth step: annotate the exams](#fifth-step-postprocess-and-annotate-the-exams)
+- [Sharing the workspace](#sharing-the-workspace)
 - [CSV files format details](#csv-files-format-details)
 
 ## Introduction
@@ -376,6 +377,195 @@ $ qrscanner -q
 ```
 
 and you are done!
+
+# Sharing the workspace
+
+
+## Overview
+
+`qrworkspace` is a command-line tool designed for managing QRGrader exam workspaces and keeping them synchronised with Google Drive. It provides a complete workflow for the full lifecycle of an exam grading session: creating a fresh local workspace with all the necessary structure and templates, uploading it to a shared Google Drive folder so that collaborators can access it, cloning an existing remote workspace onto a new machine, and pushing or pulling incremental changes as work progresses.
+
+The tool is built around a permission system that allows workspace administrators to control exactly which collaborators can modify which parts of the workspace, making it well suited to multi-user grading scenarios where different people are responsible for different sections of an exam.
+
+---
+
+## Authentication
+
+The first time `qrworkspace` connects to Google Drive, it will ask you to enter a password in order to decrypt the bundled client secret. This password is not stored anywhere on disk and must be entered manually on first use. To obtain the password, please contact **dantard@unizar.es**.
+
+Once you have entered the correct password, `qrworkspace` writes the decrypted credentials to `config/client_secret.json` and then completes the standard Google OAuth flow, saving an access token to `config/credentials.json`. On all subsequent runs, both files are reused automatically and you will not be prompted again unless the credentials expire or are deleted.
+
+> If you see the message *"Password incorrect"*, double-check for typos and try again. The encrypted secret file itself is not user-specific, so the same password works for everyone on the same installation.
+
+---
+
+## Commands
+
+### Upload a workspace (first time)
+
+```bash
+qrworkspace --upload [--folder-id <DRIVE_FOLDER_ID>]
+```
+
+Performs the initial upload of the entire local workspace to Google Drive. This command is intended to be run only once, when the workspace is first being shared with collaborators. After the upload completes, the resulting Drive folder ID is automatically saved back into `config/config.yaml` so that future `--push` and `--pull` commands know where to find the remote copy without needing the `--folder-id` flag every time.
+
+If you already know which Drive folder you want to upload into, you can supply its ID with `--folder-id`. If you omit it, `qrworkspace` will create a new folder in the root of your Drive.
+
+> **Permission required:** Only users designated as superuser or granted `*` (full) permission in the workspace `owners` list are allowed to perform an initial upload. See the [Permissions & Roles](#permissions--roles) section for details.
+
+---
+
+### Clone a workspace
+
+```bash
+qrworkspace --clone --folder-id <DRIVE_FOLDER_ID>
+```
+
+Downloads a complete copy of an existing remote workspace from Google Drive into your current directory. This is the command you will use when setting up `qrworkspace` on a new machine or when a new collaborator is joining a project and needs a local copy of the workspace.
+
+After the download is complete, `qrworkspace` automatically moves your `config/client_secret.json` and `config/credentials.json` files into the newly cloned workspace's own `config/` folder, and removes the temporary top-level `config/` directory that was created during authentication. This ensures that the cloned workspace is self-contained and ready to use immediately.
+
+If the workspace is large and you only need the core configuration and grading data (for example, if you just want to check scores and do not need the raw scanned images or generated PDFs), you can add `--minimal` to skip the heavier directories:
+
+```bash
+qrworkspace --clone --folder-id <ID> --minimal
+```
+
+With `--minimal`, the `generated/`, `scanned/`, `source/`, and `encrypted/` directories are excluded from the download, and any files containing `~` in their name (typically temporary editor files) are also skipped. This can save a significant amount of time and bandwidth on large workspaces.
+
+---
+
+### Push (upload changes)
+
+```bash
+qrworkspace --push [--folder-id <DRIVE_FOLDER_ID>]
+```
+
+Uploads any locally modified files to the remote Google Drive workspace, effectively pushing your changes so that other collaborators can see them. Unlike `--upload`, which transfers everything from scratch, `--push` performs an incremental update — only files that have changed since the last sync are transferred, making it much faster for day-to-day use.
+
+The set of files that get uploaded depends on your role in the workspace:
+
+| Role | What gets uploaded |
+|---|---|
+| Superuser with `--force` | All files in the workspace |
+| Owner with `*` permission | All files in the workspace |
+| Owner with specific paths | Only the files under the permitted paths |
+| No permission | Error — upload is denied |
+
+If `--folder-id` is not specified, `qrworkspace` reads the folder ID from `config/config.yaml`. You only need to pass `--folder-id` explicitly if you want to push to a different location than the one recorded in the config file.
+
+---
+
+### Pull (download changes)
+
+```bash
+qrworkspace --pull [--folder-id <DRIVE_FOLDER_ID>]
+```
+
+Downloads any remotely modified files from Google Drive into your local workspace, pulling in changes made by other collaborators since you last synced. Like `--push`, this is an incremental operation — files that are already up to date are not re-downloaded, so the command is efficient even on large workspaces.
+
+The same permission rules apply as for `--push`: superusers and owners with full permissions will have all remote changes downloaded, while owners with restricted permissions will have their local copies of permitted files protected from being overwritten by remote changes.
+
+At the end of the operation, a summary is printed showing how many files were downloaded, how many were already up to date, and whether any conflicts were detected.
+
+---
+
+### Commit specific files
+
+```bash
+qrworkspace --commit <relative/path/to/file> [<another/file> ...]
+```
+
+Uploads one or more specific files to Google Drive without touching anything else in the workspace. This is useful when you have made a small, targeted change — for example, correcting a single grading spreadsheet or updating the configuration — and you do not want to run a full `--push` that would scan the entire workspace for changes.
+
+You can list as many file paths as you need, all relative to the current workspace directory. The permission system is still enforced, so you can only commit files you are authorised to modify.
+
+**Example:**
+```bash
+qrworkspace --commit data/results.csv xls/grades.xlsx
+```
+
+---
+
+## Options Reference
+
+| Flag | Description |
+|---|---|
+| `-c`, `--create` | Create a new local workspace directory for today's date |
+| `-d`, `--date <YYMMDD>` | Specify the date for the new workspace; also implies `--create` |
+| `-i`, `--folder-id <ID>` | Explicitly specify a Google Drive folder ID to use instead of the one in `config.yaml` |
+| `--upload` | Perform the initial upload of the entire workspace to Google Drive |
+| `--clone` | Clone an existing workspace from Google Drive into the current directory |
+| `--minimal` | When cloning or pulling, skip large non-essential directories to save time and bandwidth |
+| `--push` | Incrementally upload local changes to the remote workspace on Google Drive |
+| `--pull` | Incrementally download remote changes from Google Drive to the local workspace |
+| `--commit <files>` | Upload one or more specific files without performing a full workspace scan |
+| `--force` | Allow a superuser to override permission checks and perform privileged actions |
+| `-s`, `--silent` | Suppress verbose output from the Google Drive client during transfers |
+| `--dry` | Perform a dry run that simulates the operation without actually uploading or downloading anything |
+
+---
+
+## Permissions & Roles
+
+Access control is configured through the `config/config.yaml` file inside each workspace. This file is created automatically when you run `--create`, but you will typically need to edit it manually to add collaborators and define their permissions.
+
+A typical configuration file looks like this:
+
+```yaml
+workbook: my-workbook
+folder_id: <DRIVE_FOLDER_ID>
+su: superuser@example.com   # Use "*" to grant superuser rights to all users
+owners:
+  user@example.com:
+    - data/          # This user may only push/pull files under data/
+  admin@example.com:
+    - "*"            # Full access to all files
+```
+
+**Superuser (`su`):** The email address listed here is the designated superuser. When this user runs `qrworkspace` with the `--force` flag, they bypass all permission checks and can upload or download any file in the workspace. Setting `su: "*"` grants superuser rights to every authenticated user, which is convenient for single-user or fully-trusted setups.
+
+**Owners:** Any user listed under `owners` is permitted to push and pull files. The list of paths associated with their email determines which files they are authorised to modify. A path like `data/` grants access to everything inside that directory, while `"*"` grants unrestricted access. Users who are not listed under `owners` and are not the superuser cannot push changes to the workspace at all.
+
+---
+
+## Typical Workflow
+
+The following example walks through the full lifecycle of a workspace, from creation on one machine through to collaborative use across multiple machines.
+
+```bash
+# 1. Create a new workspace for today's exam session
+qrworkspace --create
+
+# 2. Navigate into it and upload it to Google Drive for the first time
+cd qrgrading-250608
+qrworkspace --upload
+
+# --- On a second machine (e.g. a colleague's laptop) ---
+
+# 3. Clone the workspace using the Drive folder ID printed by --upload
+qrworkspace --clone --folder-id <ID>
+
+# 4. Do some grading work locally, then push your changes back to Drive
+cd qrgrading-250608
+qrworkspace --push
+
+# 5. Back on the first machine, pull in the colleague's updates
+qrworkspace --pull
+
+# 6. Make a quick correction and commit only the affected file
+qrworkspace --commit data/corrections.csv
+```
+
+---
+
+## Notes
+
+- `qrworkspace` must be run from **inside a workspace directory** for all commands except `--create` and `--clone`. Running it from outside a workspace (where there is no `config/config.yaml`) will result in an error.
+- The `--dry` flag is strongly recommended before performing a large `--push` or `--pull` for the first time on a new machine. It will show you exactly what would be transferred without making any actual changes, giving you a chance to verify that the correct folder ID is configured and that the file list looks as expected.
+- After every sync operation, `qrworkspace` prints a brief summary of how many files were uploaded or downloaded, how many were already up to date, and how many were skipped. If any **conflicts** are detected — meaning the same file has been modified both locally and remotely since the last sync — they are listed explicitly. You should resolve these manually before continuing, as the last-write-wins behaviour of Drive means unresolved conflicts can result in lost work.
+
+
 
 ## CSV files format details
 
