@@ -155,15 +155,17 @@ def main():
                             break
 
                 nias = generated.select(type=Code.TYPE_N, exam=int(exam), page=page.number + 1)
-                for i in range(6):
-                    r = randint(0, 9)
-                    qr = nias.first(number=i * 10 + r)
-                    if qr is not None:
-                        x = qr.x + 5
-                        y = qr.y - 7
-                        w = 10
-                        h = 10
-                        annot = page.add_redact_annot(pymupdf.Rect(x, y, x + w, y + h), fill=(0.5, 0.5, 0.5), cross_out=False)
+                if len(nias) > 0:
+                    figures = max([nia.number//10 for nia in nias])
+                    for i in range(figures + 1):
+                        r = randint(0, 9)
+                        qr = nias.first(number=i * 10 + r)
+                        if qr is not None:
+                            x = qr.x + 5
+                            y = qr.y - 7
+                            w = 10
+                            h = 10
+                            annot = page.add_redact_annot(pymupdf.Rect(x, y, x + w, y + h), fill=(0.5, 0.5, 0.5), cross_out=False)
 
                 # Apply the redactions
                 page.apply_redactions()
