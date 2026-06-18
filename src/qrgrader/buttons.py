@@ -2,6 +2,8 @@ from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QCursor, QGuiApplication, QFont
 from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSpinBox, QLabel, QTextEdit, QVBoxLayout
 
+
+
 class ThirdButton(QPushButton):
 
     def __init__(self, name):
@@ -27,6 +29,7 @@ class Button(QWidget):
         self.name = name
         self.color = kwargs.get("color", "#D4D4D4")
         self.type = "button"
+        self.data = {}
 
     def get_name(self):
         return self.name
@@ -39,6 +42,13 @@ class Button(QWidget):
 
     def get_color(self):
         return self.color
+
+    def store(self, exam_id):
+        pass
+
+    def retrieve(self, exam_id):
+        pass
+
 
 class Shortcut(Button):
     clicked = pyqtSignal()
@@ -218,6 +228,21 @@ class StepButton(PushButton):
 
         self.score_changed.emit()  # type: ignore
 
+    def store(self, exam_id):
+        self.data[exam_id] = self.get_value()
+        return self.data[exam_id]
+
+
+
+    def retrieve(self, exam_id):
+        self.set_value(self.data.get(exam_id, -1))
+
+    def insert(self, exam_id, value):
+        self.data[exam_id] = value
+
+    def query(self, exam_id):
+        return self.data.get(exam_id, -1)
+
     def set_value(self, value):
         self.button.blockSignals(True)
         self.button.setChecked(value >= 0 if self.n_steps > 0 else value > 0)
@@ -234,12 +259,6 @@ class StepButton(PushButton):
         self.button.setFont(font)
 
         self.score_changed.emit()  # type: ignore
-
-    def set_xls_value(self, value):
-        if value == "":
-            self.set_value(-1)
-        else:
-            self.set_value(int(value))
 
     def get_full_value(self):
         return self.full_value
