@@ -17,7 +17,8 @@ from gspread.utils import a1_to_rowcol, rowcol_to_a1
 from qrgrader.common import get_date, get_workspace_path
 
 from qrgrader.dialogs import ButtonEditDialog, RubricEditDialog
-from qrgrader.buttons import StepButton, Shortcut, Button, TextButton, StateButton, Separator, CutterButton, MultiplierButton
+from qrgrader.buttons import StepButton, Shortcut, Button, TextButton, StateButton, Separator, CutterButton, \
+    MultiplierButton, PercentButton
 from qrgrader.filter_dialog import FilterDialog
 import qrgrader.qrsheets as qrsheets
 
@@ -53,11 +54,11 @@ class Rubric(QListWidget):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.setMinimumWidth(115)
 
-        self.schemaChanged.connect(self.schema_changed) # type: ignore
+        self.schemaChanged.connect(self.schema_changed)  # type: ignore
         self.customContextMenuRequested.connect(self.button_list_right_click)
 
         self.filter_btn = QPushButton("Apply Filter")
-        #self.filter_btn.setFlat(True)
+        # self.filter_btn.setFlat(True)
         self.filter_btn.setCheckable(True)
         self.filter_btn.setStyleSheet("background-color: #F0A0A0")
         self.filter_btn.clicked.connect(self.toggle_filter)
@@ -66,7 +67,7 @@ class Rubric(QListWidget):
         self.upload_btn.setStyleSheet("background-color: #00A0A0")
         self.upload_btn.clicked.connect(self.upload_xls)
         print("jjj")
-        #self.populate()
+        # self.populate()
         self.load_table()
 
     def get_filter_button(self):
@@ -89,19 +90,22 @@ class Rubric(QListWidget):
         sheet = Sheets(config_dir=folder, yes=True)
 
         self.pd = get_pd("Checking...", self)
+
         def check():
             sheet.open(config.get("workbook"))
             self.pd.close()
 
             if sheet.worksheet_exists(sheet_name):
-                ret = QMessageBox().question(self, '', f"A sheet named '{sheet_name}' already exists in the workbook\nDo you want to overwrite it?", QMessageBox.Yes | QMessageBox.No)
+                ret = QMessageBox().question(self, '',
+                                             f"A sheet named '{sheet_name}' already exists in the workbook\nDo you want to overwrite it?",
+                                             QMessageBox.Yes | QMessageBox.No)
                 if ret != QMessageBox.Yes:
                     return
 
-            run_with_progress(self, "Uploading " + sheet_name + " to Google Sheets...", lambda: sheet.upload(self.table_filename, sheet_name))
+            run_with_progress(self, "Uploading " + sheet_name + " to Google Sheets...",
+                              lambda: sheet.upload(self.table_filename, sheet_name))
 
         QTimer.singleShot(100, check)
-
 
     def toggle_filter(self):
         if not self.filter_btn.isChecked():
@@ -116,7 +120,6 @@ class Rubric(QListWidget):
                 self.filter_btn.setChecked(False)
                 self.filters = None
                 self.filtered.emit()
-
 
     def set_filter(self, filters):
         self.filters = filters
@@ -170,11 +173,17 @@ class Rubric(QListWidget):
                     self.addItem(item)
                     self.setItemWidget(item, button)
                     item.setSizeHint(button.sizeHint())
-                    for exam_id in table.index[5:]:
-                        value = table.loc[exam_id, name]
-                        value = -1 if value == "" else int(value)
-                        button.insert(int(exam_id), value)
 
+                    if isinstance(button, (Separator, Shortcut)):
+                        continue
+
+                    for exam_id in table.index[5:]:
+                        if isinstance(button, (StepButton, PercentButton)):
+                            value = -1 if table.loc[exam_id, name] == "" else int(table.loc[exam_id, name])
+                        elif isinstance(button, TextButton):
+                            value = table.loc[exam_id, name]
+
+                        button.insert(int(exam_id), value)
 
     def push(self, exam_id):
         if exam_id is not None:
@@ -209,8 +218,8 @@ class Rubric(QListWidget):
         self.store(self.exam_id)
         self.score_changed.emit(self, self.exam_id)
         button = self.sender()
-        if button.get_click_next() and button.is_checked():
-            QTimer.singleShot(500, self.goto_next.emit)
+        # TODO: if button.get_click_next() and button.is_checked():
+        # QTimer.singleShot(500, self.goto_next.emit)
 
     def add_button(self):
 
@@ -292,39 +301,46 @@ class Rubric(QListWidget):
         self.clearSelection()
         self.clearFocus()
 
-
     def save_xls(self):
         df = pandas.DataFrame()
-        for button in self.filter_buttons(StepButton):
+        for button in self.filter_buttons(Button):
             df[button.get_name()] = pandas.NA
             df.loc['type', button.get_name()] = button.get_type()
             df.loc['color', button.get_name()] = button.get_color()
-            df.loc['weight', button.get_name()] = button.get_weight()
-            df.loc['steps', button.get_name()] = button.get_steps()
-            df.loc['full', button.get_name()] = button.get_full_value()
+            if isinstance(button, StepButton):
+                df.loc['steps', button.get_name()] = button.get_steps()
+                df.loc['full', button.get_name()] = button.get_full_value()
+                df.loc['weight', button.get_name()] = button.get_weight()
+            elif isinstance(button, MultiplierButton):
+                df.loc['full', button.get_name()] = button.get_percent()
+            elif isinstance(button, Shortcut):
+                df.loc['full', button.get_name()] = ";".join(button.get_buttons())
+                continue
+
             for exam_id in button.data:
                 value = button.query(exam_id)
-                df.loc[exam_id, button.get_name()] = str(value) if value > 0 else ""
+                if isinstance(button, (StepButton, PercentButton)):
+                    df.loc[exam_id, button.get_name()] = str(value) if value > 0 else ""
+                else:
+                    df.loc[exam_id, button.get_name()] = str(value)
+        # df.to_csv(self.table_filename, sep="\t", index=True)
+
+        idx = df.columns.get_indexer(df.columns[df.loc["type"] == "button"])
+
+        denominator = "/sumif({0"
+        for col in idx:
+            denominator += "," + rowcol_to_a1(5, int(col) + 2) + "*" + rowcol_to_a1(6, int(col) + 2)
+        denominator += '}, ">0")'
+
+        for row, exam_id in enumerate(df.index.tolist()):
+            if row > 4:
+                numer = "=(0"
+                for col in idx:
+                    numer += "+" + rowcol_to_a1(row + 2, int(col) + 2) + "*" + rowcol_to_a1(5, int(col) + 2)
+                numer += ")"
+                df.loc[exam_id, "Score"] = numer + denominator
+
         df.to_csv(self.table_filename, sep="\t", index=True)
-
-
-
-        # idx = self.table.columns.get_indexer(self.table.columns[self.table.loc["type"] == "button"])
-        #
-        # denominator = "/sumif({0"
-        # for col in idx:
-        #     denominator += "," + rowcol_to_a1(5, int(col) + 2) +"*" + rowcol_to_a1(6, int(col) + 2)
-        # denominator += '}, ">0")'
-        #
-        # for row, exam_id in enumerate(self.table.index.tolist()):
-        #     if row > 4:
-        #         numer = "=(0"
-        #         for col in idx:
-        #             numer += "+" + rowcol_to_a1(row + 2, int(col) + 2) + "*" + rowcol_to_a1(5, int(col) + 2)
-        #         numer += ")"
-        #         self.table.loc[exam_id, "Score"] = numer + denominator
-        #
-        # self.table.to_csv(self.table_filename, sep="\t", index=True)
 
     def compute_score(self, exam_id):
         total = 0
@@ -384,15 +400,9 @@ class Rubric(QListWidget):
                 if b.button.isChecked():
                     buttons.append(b.get_name())
 
+            print("Adding shortcut", text, "with buttons", buttons)
             b2 = Shortcut(text, buttons=buttons)
             b2.clicked.connect(self.shortcut_activated)  # type: ignore
-
-            self.table[text] = ""
-            self.table.loc["type", text] = "shortcut"
-            self.table.loc["color", text] = b2.get_color()
-            self.table.loc["full", text] = ";".join(buttons)
-            self.table.loc["steps", text] = "0"
-            self.table.loc["weight", text] = "0.0"
 
             item = QListWidgetItem()
             self.addItem(item)
@@ -400,9 +410,7 @@ class Rubric(QListWidget):
             item.setSizeHint(b2.sizeHint())
             item.setFlags(item.flags() & ~Qt.ItemIsDragEnabled)
             self.schema_changed()
-            print(self.table)
 
-    #
     def delete_button(self, position):
         ret = QMessageBox().question(self, '', "Are you sure?", QMessageBox.Yes | QMessageBox.No)
 
@@ -442,7 +450,7 @@ class Rubric(QListWidget):
         widget = self.itemWidget(item)
         name, valid = QInputDialog.getText(self, 'Duplicate', 'Name:', text=widget.get_name() + "_copy")
         if valid:
-            button = widget.__class__(name)#, **widget.get_config().copy())
+            button = widget.__class__(name)  # , **widget.get_config().copy())
             button.score_changed.connect(self.button_clicked)
             item = QListWidgetItem()
             self.addItem(item)
@@ -488,11 +496,11 @@ class Rubric(QListWidget):
     def store(self, exam_id):
         assessed = False
         for button in self.filter_buttons(StateButton):  # type: Score
-            assessed = button.store(exam_id) > 0 or assessed
+            print("Storing", button.get_name(), "for", exam_id)
+            assessed = button.store(exam_id) or assessed
 
         self.save_xls()
         return assessed
-
 
     def assessed(self, exam_id):
         return False
@@ -500,6 +508,7 @@ class Rubric(QListWidget):
     def retrieve(self, exam_id):
         self.current_exam_id = exam_id
         for button in self.filter_buttons(StateButton):
+            print("retrieving button", button.get_name(), "for", exam_id)
             button.blockSignals(True)
             button.retrieve(exam_id)
             button.blockSignals(False)
@@ -532,5 +541,3 @@ class Rubric(QListWidget):
             if isinstance(widget, kind):
                 buttons.append(widget)
         return buttons
-
-

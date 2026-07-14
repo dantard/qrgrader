@@ -3,7 +3,6 @@ from PyQt5.QtGui import QCursor, QGuiApplication, QFont
 from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSpinBox, QLabel, QTextEdit, QVBoxLayout
 
 
-
 class ThirdButton(QPushButton):
 
     def __init__(self, name):
@@ -12,7 +11,7 @@ class ThirdButton(QPushButton):
 
     def mousePressEvent(self, a0):
         super().mousePressEvent(a0)
-        #a0.accept()
+        # a0.accept()
         self.which = a0.button()
         if self.which == Qt.MidButton:
             self.click()
@@ -55,6 +54,7 @@ class Shortcut(Button):
 
     def __init__(self, name, **kwargs):
         super().__init__(name)
+        self.type = "shortcut"
         self.button = QPushButton(name)
         self.button.clicked.connect(self.clicked.emit)  # type: ignore
         self.buttons = kwargs.get("buttons", [])
@@ -66,7 +66,6 @@ class Shortcut(Button):
 
     def get_buttons(self):
         return self.buttons
-
 
 
 class Separator(Button):
@@ -81,10 +80,12 @@ class Separator(Button):
         self.type = "separator"
 
 
-
 class StateButton(Button):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
+
+    def insert(self, exam_id, value):
+        self.data[exam_id] = value
 
 
 class TextButton(StateButton):
@@ -92,7 +93,7 @@ class TextButton(StateButton):
 
     def __init__(self, name, **kwargs):
         super().__init__(name)
-        self.button = QTextEdit(name)
+        self.button = QTextEdit()
         self.button.setMinimumWidth(10)
         self.setMinimumWidth(10)
         self.setLayout(QVBoxLayout())
@@ -104,18 +105,24 @@ class TextButton(StateButton):
     def get_value(self):
         return self.button.toPlainText()
 
-    def get_xls_value(self):
-        return self.button.toPlainText().replace("\n", ";")
-
     def set_value(self, value):
-        self.button.setText(value)
+        self.button.setText(str(value))
 
-    def set_xls_value(self, value):
-        self.button.setText(value.replace(";","\n"))
+    def store(self, exam_id):
+        print("Storining text button value for exam_id: ", exam_id, " value: ", self.get_value(), "")
+        self.data[exam_id] = self.get_value()
+        return self.data[exam_id] is not None and self.data[exam_id] != ""
+
+    def retrieve(self, exam_id):
+        self.set_value(self.data.get(exam_id, ""))
+
+    def query(self, exam_id):
+        return self.data.get(exam_id, "oooo")
+
 
 class PushButton(StateButton):
 
-    def __init__(self,name, **kwargs):
+    def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
         self.button = ThirdButton(name)
         self.button.setMinimumWidth(10)
@@ -132,6 +139,20 @@ class PushButton(StateButton):
     def set_color(self, color):
         self.color = color
         self.button.setStyleSheet(f'background-color: {color}')
+
+    def store(self, exam_id):
+        self.data[exam_id] = self.get_value()
+        print("Storing push button value for exam_id: ", exam_id, " value: ", self.get_value(), "type: ", type(self))
+        return self.data[exam_id] > 0
+
+    def query(self, exam_id):
+        return self.data.get(exam_id, -1)
+
+    def retrieve(self, exam_id):
+        value = self.data.get(exam_id, -1)
+        print("retrieving step button value for exam_id: ", exam_id, " value: ", value, "type: ", type(self))
+        self.set_value(value)
+
 
 class StepButton(PushButton):
     score_changed = pyqtSignal()
@@ -207,10 +228,6 @@ class StepButton(PushButton):
 
         return value
 
-    def get_xls_value(self):
-        value = self.get_value()
-        return "" if value == -1 else str(value)
-
     def clicked(self):
         self.spinner.blockSignals(True)
         if QGuiApplication.queryKeyboardModifiers() == Qt.ControlModifier:
@@ -227,21 +244,6 @@ class StepButton(PushButton):
         self.button.setFont(font)
 
         self.score_changed.emit()  # type: ignore
-
-    def store(self, exam_id):
-        self.data[exam_id] = self.get_value()
-        return self.data[exam_id]
-
-
-
-    def retrieve(self, exam_id):
-        self.set_value(self.data.get(exam_id, -1))
-
-    def insert(self, exam_id, value):
-        self.data[exam_id] = value
-
-    def query(self, exam_id):
-        return self.data.get(exam_id, -1)
 
     def set_value(self, value):
         self.button.blockSignals(True)
@@ -286,17 +288,12 @@ class PercentButton(PushButton):
     def get_value(self):
         return 1 if self.button.isChecked() else 0
 
-    def get_xls_value(self):
-        return str(self.get_value())
-
     def get_percent(self):
         return self.percent
 
     def set_value(self, state):
+        print("Setting percent button value for exam_id: ", self.name, " value: ", state, "type: ", type(self))
         self.button.setChecked(state == 1)
-
-    def set_xls_value(self, value):
-        self.set_value(int(value))
 
 
 class MultiplierButton(PercentButton):
