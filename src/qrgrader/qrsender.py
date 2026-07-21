@@ -31,8 +31,6 @@ from qrgrader.common import StudentsData, Nia, get_workspace_paths, get_date
 # ──────────────────────────────────────────────
 SMTP_SERVER   = "smtp.gmail.com"        # Gmail. Outlook: smtp.office365.com
 SMTP_PORT     = 587
-REMITENTE     = "dantard@unizar.es"
-CONTRASENA    = "ibadwgsoirmfvngs"  # Ver nota al final
 # ──────────────────────────────────────────────
 
 
@@ -96,10 +94,11 @@ def main():
         name = row["name"].strip()
         apellido, nombre = name.split(",")
         alumno = {"email": f"{row['nia']}@unizar.es",
-                  "asunto": "[FINF] Su examen de primera convocatoria escaneado",
-                  "texto": f"Estimado/a CC/DC {apellido},\nen el adjunto encontrará su examen escaneado.\n\nReciba un cordial saludo.",
+                  "asunto": "[SAU] Su examen de segunda convocatoria escaneado",
+                  "texto": f"Estimado/a CAC/DAC {apellido},\nen el adjunto encontrará su examen escaneado.\n\nReciba un cordial saludo.",
                   "ficheros": [f"{dir_publish}{row['uid']}.pdf"]
                   }
+
         ok, msg = enviar_correos(alumno)
         if ok:
             exams.remove(row["uid"])

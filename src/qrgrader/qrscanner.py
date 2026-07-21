@@ -428,7 +428,7 @@ def main():
         df.insert(4, "SEC", "")
         for exam_id in df.iloc[hdr+1:, 0].tolist():
             symbol, text, num_nia = nia.get_nia(int(exam_id))
-            df.loc[int(exam_id), "SEC"] = students_data.get_group(num_nia) if num_nia is not None else ""
+            df.loc[int(exam_id), "SEC"] = str(students_data.get_group(num_nia) if num_nia is not None else "")
 
         df.iloc[hdr, 0:8] = ["EXAM", "#", "NIA", "NAME", "SEC", "Q", "O", "T"]
 
