@@ -148,6 +148,15 @@ class StudentsData:
 
         return by_nia.iloc[0]["GROUP"]
 
+    def get_email(self, nia):
+        if self.data is None:
+            return None
+        by_nia = self.data[self.data["NIA"] == nia]
+        if by_nia.empty:
+            return None
+
+        return by_nia.iloc[0]["EMAIL"]
+
     def get_nia_from_name(self, name):
         if self.data is None:
             return None
@@ -197,15 +206,27 @@ class Password:
 
 class Nia:
 
-    def __init__(self, type_n):
+    def __init__(self, type_n=None):
         self.valid_nias = []
         self.codes = type_n
         self.all_nia = []
         self.nia = {}
 
+    def from_codes_file(self, filename):
+        codes = CodeSet()
+        if not codes.load(filename):
+            return False
+        self.codes = codes.select(type=Code.TYPE_N)
+        self._process()
+        return True
+
     def load(self, type_n=None):
         if type_n is not None:
             self.codes = type_n
+        self._process()
+
+    def _process(self):
+        self.nia.clear()
         exams = list(set(int(code.data[1:10]) for code in self.codes))
         for exam in exams:
             codes = sorted(
@@ -216,6 +237,9 @@ class Nia:
             nia = int("".join([c[-1] for c in codes])) if len(codes) > 0 else 0
             self.nia[exam] = int(nia)
         return True
+
+    def get_all_nias(self):
+        return list(self.nia.values())
 
     def update_exam(self, exam_id):
         codes = sorted(
@@ -232,7 +256,7 @@ class Nia:
         if nia is None:
             return "?", "No exam", None
         elif str(nia).isdigit():
-            if self.all_nia.count(nia) > 1:
+            if self.get_all_nias().count(nia) > 1:
                 return "D", str(nia), nia
             elif len(self.valid_nias) > 0 and nia not in self.valid_nias:
                 return "?", str(nia), nia

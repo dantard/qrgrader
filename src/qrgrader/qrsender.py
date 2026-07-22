@@ -10,10 +10,11 @@ Preparar un CSV con estas columnas:
 Ejemplo de fila en el CSV:
   Juan García, juan@example.com, "Hola Juan, tu nota es un 8...", /ruta/al/fichero_juan.pdf
 """
-
+import argparse
 import smtplib
 import csv
 import os
+import sys
 import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -21,6 +22,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 
 import pandas
+import yaml
 
 from qrgrader.code import Code
 from qrgrader.code_set import CodeSet
@@ -31,6 +33,7 @@ from qrgrader.common import StudentsData, Nia, get_workspace_paths, get_date
 # ──────────────────────────────────────────────
 SMTP_SERVER   = "smtp.gmail.com"        # Gmail. Outlook: smtp.office365.com
 SMTP_PORT     = 587
+
 # ──────────────────────────────────────────────
 
 
@@ -83,44 +86,61 @@ def enviar_correos(alumno):
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Patching and detection')
+
+    parser.add_argument('-f', '--file', help='YAML file', default=None)
+    parser.add_argument('-l', '--list', help='List of students', action="store_true")
+    parser.add_argument('-b', '--begin', help='First exam to be sent', type=int, default=0)
+
+    args = parser.parse_args()
+
     dir_workspace, dir_data, dir_scanned, dir_generated, dir_xls, dir_publish, dir_source = get_workspace_paths(os.getcwd())
+    nias = Nia()
     prefix = get_date() + "_"
-    df = pandas.read_csv(dir_xls + prefix + "table.csv", sep='\t', header=0)
-    df = df.iloc[4:,0:5]
-    df.columns = ["uid", "id", "nia", "name", "group"]
-    exams = df.loc[:, "uid"].tolist()
-    row1, col = df.shape
-    for index, row in df.iterrows():
-        name = row["name"].strip()
-        apellido, nombre = name.split(",")
-        alumno = {"email": f"{row['nia']}@unizar.es",
-                  "asunto": "[SAU] Su examen de segunda convocatoria escaneado",
-                  "texto": f"Estimado/a CAC/DAC {apellido},\nen el adjunto encontrará su examen escaneado.\n\nReciba un cordial saludo.",
-                  "ficheros": [f"{dir_publish}{row['uid']}.pdf"]
-                  }
+    nias.from_codes_file(dir_data + prefix + "detected.csv")
+    students = StudentsData(dir_xls + prefix + "data.csv")
+    if not students.load():
+        print("Students data file not found")
 
-        ok, msg = enviar_correos(alumno)
-        if ok:
-            exams.remove(row["uid"])
-            print(f"Enviado a {row['nia']} ({row['name']}) ({index+1}/{row1})")
-        else:
-            print(f"Error al enviar a {row['nia']} ({row['name']}): {msg}")
+    if args.list:
+        for i, nia in enumerate(nias.get_all_nias()):
+            nia = int(nia)
+            exam_id = nias.get_exam(nia)  # Load exam IDs for all NIAs
+            name = students.get_name(nia)  # Load names for all NIAs
+            email = students.get_email(nia).strip()
+            print(f"{i:3d}  {exam_id}  {email}  {name}")
+        return
 
-        time.sleep(1)
+    if args.file:
+        if not os.path.isfile(args.file):
+            print(f"YAML file not found: {args.file}")
+            return
+    else:
+        print("YAML file is required. Use -f <file> to specify the file.")
+        return
 
-    print("Exámenes sin enviar:", exams)
+    with open(args.file, newline='', encoding='utf-8') as csvfile:
+        master = yaml.safe_load(csvfile)
 
+    for i, nia in enumerate(nias.get_all_nias()):
+        if i >= args.begin:
+            nia = int(nia)
+            exam_id = nias.get_exam(nia)  # Load exam IDs for all NIAs
+            name = students.get_name(nia)  # Load names for all NIAs
+            email = students.get_email(nia).strip()
+            alumno = master.copy()
+            alumno["email"] =  f"{email}"
+            alumno["email"] = "dantard@unizar.es"
+            alumno["ficheros"] = [f"{dir_publish}{exam_id}.pdf"]
+            alumno["texto"] = alumno["texto"].replace("{name}", name)
+            alumno["asunto"] = alumno["asunto"].replace("{name}", name)
+            ok, msg = enviar_correos(alumno)
+            if ok:
+                print(f"Sent exam {i:3d} -> {exam_id} to {email}")
+            else:
+                print(f"Error sending exam {i} -> {exam_id} to {email}: {msg}")
 
-
-    '''
-    alumno = {"nombre": "Danilo", "email": "daniletto@gmail.com",
-              "texto": "Hola Danilo, tu nota es un 10..."}
-              #"fichero": "/home/danilo/T08B_informe_valoracion_tesis_doctoral.pdf"}
-    for i in range(300):
-        ok, msg = enviar_correos(alumno)
-        print(i, ok, msg)
-        time.sleep(1)
-    '''
+            time.sleep(1)
 
 if __name__ == "__main__":
     main()
