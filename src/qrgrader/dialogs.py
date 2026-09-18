@@ -47,6 +47,7 @@ class ButtonEditDialog(QDialog):
         self.value.setMinimum(-20)
         self.value.setMaximum(20)
         self.value.setSingleStep(0.5)
+        self.value.setValue(1)
         self.value.valueChanged.connect(self.spin_value_changed)  # type: ignore
         self.layout.addWidget(WidgetsRow("Value", self.value))
 
@@ -61,11 +62,13 @@ class ButtonEditDialog(QDialog):
         self.percent.setMaximum(100)
         self.layout.addWidget(WidgetsRow("Percent", self.percent))
         #
-        self.weight = QDoubleSpinBox()
-        self.weight.setDecimals(2)
-        self.weight.setMinimum(-20)
-        self.weight.setMaximum(20)
-        self.weight.setSingleStep(0.5)
+        self.weight = QSpinBox()
+        #self.weight.setDecimals(2)
+        self.weight.setMinimum(0)
+        self.weight.setMaximum(1)
+        #self.weight.setSingleStep(0.5)
+        self.weight.setValue(1)
+        self.percent.setValue(100)
         self.layout.addWidget(WidgetsRow("Weight", self.weight))
 
         self.click_next_cb = QCheckBox("Next on click")
@@ -88,15 +91,12 @@ class ButtonEditDialog(QDialog):
                 self.percent.setValue(int(button.get_percent() * 100))
             if button.get_type() in ['button']:
                 self.steps.setValue(int(button.get_steps()))
-                self.weight.setValue(float(button.get_weight()))
+                self.weight.setValue(int(button.get_weight()))
                 self.click_next_cb.setChecked(button.get_click_next())
-
-            self.value.setValue(float(button.get_full_value()))
+                self.value.setValue(float(button.get_full_value()))
             self.colorButton.setStyleSheet(f'background-color: {button.get_color()}')
 
         self.enable_widgets()
-
-
 
     def check_valid_name(self, text):
         ok = self.le.text() != "" and self.le.text() not in self.existing_names
@@ -123,7 +123,7 @@ class ButtonEditDialog(QDialog):
         self.layout.widgets['Steps'].setVisible(b)
         self.layout.widgets['Weight'].setVisible(b)
         self.layout.widgets['Color'].setVisible(bmc)
-        #self.layout.widgets['Percent'].setVisible(mc)
+        self.layout.widgets['Percent'].setVisible(mc)
         self.click_next_cb.setVisible(b)
 
         self.adjustSize()

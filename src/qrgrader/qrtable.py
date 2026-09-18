@@ -86,13 +86,13 @@ def main():
 
     for question in questions.get_questions():
         if questions.get_type(question) == "Q":
-            names.extend([questions.get_text(question), "", "", percent_ques])
+            names.extend([questions.get_brief(question), "", "", percent_ques])
             qn.extend([question, question, question, question])
             ans_value.extend([questions.get_value(question, i + 1) for i in range(4)])
             ans_letter.extend([chr(65 + i) for i in range(4)])
             ans_perc.extend([percent_answ] * 4)
         else:
-            names.append(questions.get_text(question))
+            names.append(questions.get_brief(question))
             qn.append(question)
             ans_letter.append("O")
             ans_value.append(questions.get_value(question, 1))

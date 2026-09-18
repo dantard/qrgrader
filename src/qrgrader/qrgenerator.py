@@ -148,13 +148,13 @@ def main():
                 log = log.split(";;;")
                 questions_number = []
                 with open(dir_xls + prefix + "questions.csv".format(date), "w", encoding='utf-8') as filew:
-                    data = "ID\tTYPE\tA\tB\tC\tD\tBRIEF\n"
+                    data = "ID\tTYPE\tA\tB\tC\tD\tBRIEF\tMAIN\n"
 
                     for i in range(1, len(log) - 1):
                         line = log[i].replace("\n", "").replace("\t", "")
                         fields = line.split(";;")
                         fields = [f for f in fields if f != ""]
-                        if len(fields) == 6:
+                        if len(fields) == 7:
 
                             if fields[0] in questions_number:
                                 print("\n****************************************************")
@@ -164,11 +164,11 @@ def main():
                                 questions_number.append(fields[0])
 
                             line = fields[0] + "\t" + fields[1] + \
-                                   "\t" + (fields[3] if fields[2] == "a" else fields[4].replace(" ", "")) + \
-                                   "\t" + (fields[3] if fields[2] == "b" else fields[4].replace(" ", "")) + \
-                                   "\t" + (fields[3] if fields[2] == "c" else fields[4].replace(" ", "")) + \
-                                   "\t" + (fields[3] if fields[2] == "d" else fields[4].replace(" ", "")) + \
-                                   "\t" + fields[5]
+                                   "\t" + (fields[3] if "a" in fields[2]  else fields[4].replace(" ", "")) + \
+                                   "\t" + (fields[3] if "b" in fields[2] else fields[4].replace(" ", "")) + \
+                                   "\t" + (fields[3] if "c" in fields[2] else fields[4].replace(" ", "")) + \
+                                   "\t" + (fields[3] if "d" in fields[2] else fields[4].replace(" ", "")) + \
+                                   "\t" + fields[5] +  "\t" + fields[6]
                             data += line + "\n"
 
                             # Create .scm file for each O type question

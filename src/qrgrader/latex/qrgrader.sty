@@ -99,7 +99,7 @@
         % WITH SCALING
         %\newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\scalebox{\barsize}{\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\psbarcode[transx=-0.3cm,transy=-0.3cm]{#1}{includetext width=0.3 height=0.3 }{azteccode}\end{pspicture}}}
         % WITHOUT SCALING
-        \newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\psbarcode[transx=-0.3cm,transy=-0.3cm]{#1}{includetext width=0.3 height=0.3 format=compact eclevel=40 ecaddchars=1}{azteccode}\end{pspicture}}
+        \newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\psbarcode[transx=-0.3cm,transy=-0.3cm]{#1}{includetext width=0.3 height=0.3 format=compact eclevel=23}{azteccode}\end{pspicture}}
     \fi
 \fi
 
@@ -186,18 +186,19 @@
 
 %GENERIC QUESTION
 \newkeycommand*\question
-[score=, penalty=, brief=, enum correct={a,b,c,d}, main=, ordered=, style={default,list,matrix,redundant,open,horizontal}][6]
+[score=, penalty=, brief=, correct={a}, main=, ordered=, style={default,list,matrix,redundant,open,horizontal
+},shownum={yes,no,none}, type={Q}][6]
 {
     \ifcommandkey{main}{%
         \setexamid{\uniqueid}
         \pgfmathsetseed{\numexpr \commandkey{main} * 1 + \examid \relax}
         \pgfmathparse{random(100,999)}
         \edef\tentimes{\the\numexpr\pgfmathresult*10\relax}
-        \ifnum\pdfstrcmp{\commandkey{ordered}}{yes}=0
-            \pgfmathparse{1}
-        \else
+        \ifnum\pdfstrcmp{\commandkey{ordered}}{no}=0
             \pgfmathsetseed{\numexpr #1 * 1 + \examid \relax}
             \pgfmathparse{random(1,8)}
+        \else
+            \pgfmathparse{1}
         \fi
         \edef\questionvalue{\the\numexpr\tentimes+\pgfmathresult\relax}
     }
@@ -207,16 +208,22 @@
     }
     %\pgfmathsetseed{1}
     \DTLnewrow{list}%
+    
+    \dtlexpandnewvalue
     \DTLnewdbentry{list}{id}{#1}%
+    \dtlnoexpandnewvalue
+    
     %\dtlexpandnewvalue
-    \DTLnewdbentry{list}{label}{{\setstretch{1.15}#2}}%
+    \DTLnewdbentry{list}{label}{{\setstretch{1.15}\xspace#2}}%
     \DTLnewdbentry{list}{qa}{#3}%
     \DTLnewdbentry{list}{qb}{#4}%
     \DTLnewdbentry{list}{qc}{#5}%
     \DTLnewdbentry{list}{qd}{#6}%
     \DTLnewdbentry{list}{ok}{0}%
     \DTLnewdbentry{list}{appendix}{}
+
     \dtlexpandnewvalue
+    \DTLnewdbentry{list}{main}{\ifcommandkey{main}{\commandkey{main}}{#1}}%
         \DTLnewdbentry{list}{correct}{\commandkey{correct}}%
         \DTLnewdbentry{list}{score}{\ifcommandkey{score}%{\textbf{($+$\commandkey{score}\hspace{-0.25em}}}{}
         {\textbf{($+$\commandkey{score}}}{}
@@ -225,11 +232,17 @@
         {\ifcommandkey{score}{\textbf{)}}{}} %0.55em
         }%
         \DTLnewdbentry{list}{style}{\commandkey{style}}
+        \DTLnewdbentry{list}{shownum}{\commandkey{shownum}}
         \DTLnewdbentry{list}{value}{\questionvalue}
+	\DTLnewdbentry{list}{brief}{\commandkey{brief}}
         %\DTLnewdbentry{list}{main}{\commandkey{main}}
     \dtlnoexpandnewvalue
 
-    \typeout{;;;#1;;Q;;\commandkey{correct};;\ifcommandkey{score}{\commandkey{score}}{0};;\ifcommandkey{penalty}{-\commandkey{penalty}}{0};;\ifcommandkey{brief}{\commandkey{brief}}{Empty};;;}
+    \typeout{;;;#1;;\commandkey{type};;\commandkey{correct};;
+        \ifcommandkey{score}{\commandkey{score}}{0};;
+        \ifcommandkey{penalty}{-\commandkey{penalty}}{0};;
+        \ifcommandkey{brief}{\commandkey{brief}}{Empty};;
+        \ifcommandkey{main}{\commandkey{main}}{#1};;;}
 
 
 %    \mymessage{#2;;#3;;#4;;#5;;#6;;;}
@@ -237,7 +250,16 @@
     \expandafter\xdef\csname rnd #1\endcsname{\the\numexpr\pgfmathresult*1\relax}
 }
 
-\newkeycommand*\mainquestion[brief=][3]
+\NewDocumentCommand{\subquestion}{O{} m m m m m m}{%
+    \question[shownum=no,#1]{#2}{#3}{#4}{#5}{#6}{#7}
+}
+
+
+\NewDocumentCommand{\subanswer}{O{} m m m m m}{%
+    \question[shownum=none,#1]{#2}{}{#3}{#4}{#5}{#6}
+}
+
+\newkeycommand*\stem[brief=][3]
 {       \setexamid{\uniqueid}
         \pgfmathsetseed{\numexpr #1 * 1 + \examid \relax}
         \pgfmathparse{random(100,999)}
@@ -246,6 +268,7 @@
         \DTLnewdbentry{list}{id}{#1}%
         \DTLnewdbentry{list}{label}{#3}%
         \DTLnewdbentry{list}{qa}{#2}%
+        \DTLnewdbentry{list}{main}{#1}%
         \dtlexpandnewvalue
             \DTLnewdbentry{list}{style}{mainquestion}
             \DTLnewdbentry{list}{value}{\tentimes}
@@ -283,22 +306,29 @@
 {
         \pgfmathparse{random(99999,99999)}
         \DTLnewrow{list}%
+        \dtlexpandnewvalue
         \DTLnewdbentry{list}{id}{#1}%
+        \dtlnoexpandnewvalue
         \DTLnewdbentry{list}{qa}{#2}%
         \DTLnewdbentry{list}{qb}{#2}%
         \DTLnewdbentry{list}{qc}{#2}%
         \DTLnewdbentry{list}{qd}{#2}%
         \DTLnewdbentry{list}{ok}{0}%
         \DTLnewdbentry{list}{label}{#3}%
+        \DTLnewdbentry{list}{main}{#1}%
         \dtlexpandnewvalue
-
-            \DTLnewdbentry{list}{score}{\ifcommandkey{score}{\textbf{(+\commandkey{score})~}}{}}%
+            \DTLnewdbentry{list}{correct}{a}%
+            \DTLnewdbentry{list}{score}{\ifcommandkey{score}{\textbf{(+\commandkey{score})}}{}}%
             \DTLnewdbentry{list}{style}{devel}
             \DTLnewdbentry{list}{value}{\the\numexpr\pgfmathresult*1\relax}
             \DTLnewdbentry{list}{appendix}{}
+            \DTLnewdbentry{list}{brief}{\commandkey{brief}}
         \dtlnoexpandnewvalue
 
-        \typeout{;;;#1;;O;;a;;\ifcommandkey{score}{\commandkey{score}}{0};;0;;\ifcommandkey{brief}{\commandkey{brief}}{Empty};;;}
+        \typeout{;;;#1;;O;;a;;
+          \ifcommandkey{score}{\commandkey{score}}{0};;0;;
+          \ifcommandkey{brief}{\commandkey{brief}}{Empty};;
+          #1;;;}
 %        \mymessage{#3;;#2;;None;;None;;None;;;}
 
         \expandafter\xdef\csname rnd #1\endcsname{\the\numexpr\pgfmathresult*1\relax}
@@ -359,7 +389,10 @@
         %
         \newcommand\np{0}
         %
-        \begin{enumerate}
+        %{%
+        \raggedbottom
+         %\setlength{\parskip}{0pt}%
+        \begin{enumerate}[itemsep=0pt, parsep=0pt, topsep=0pt, partopsep=0pt]
         %\itemindent=-12pt
                 %
                 %  For each question in the database 'list'
@@ -369,7 +402,7 @@
                 %%% \vfill
                 %
                 \DTLforeach*{list}{\theLabel=label,\theQA=qa,\theQB=qb,\theQC=qc,\theQD=qd, \theValue=value, \theIdOrig=id, \theOK=ok, \theStyle=style,
-                \theCorrect=correct, \theAppendix=appendix, \theScore=score}{
+                \theCorrect=correct, \theAppendix=appendix, \theScore=score, \theBrief=brief, \theShowNum=shownum, \theMain=main}{
                         %%
                         % Sums first parameter to \theIdOrig -> replace theIdOrig with theId for previous behavior
                         %%
@@ -390,11 +423,13 @@
                             \def \checkmarkb {\ifthenelse{\equal{\theCorrect}{b}}{~\checkmark}{}}
                             \def \checkmarkc {\ifthenelse{\equal{\theCorrect}{c}}{~\checkmark}{}}
                             \def \checkmarkd {\ifthenelse{\equal{\theCorrect}{d}}{~\checkmark}{}}
+                            \def\briefname{\textbf{\xspace(\theIdOrig, \theBrief)}}
                         }{
                             \def \checkmarka{}
                             \def \checkmarkb{}
                             \def \checkmarkc{}
                             \def \checkmarkd{}
+                            \def\briefname{}
                         }
                         %%
                         % Create 'opti' database and insert data for answers
@@ -432,9 +467,9 @@
                         \ifnum\pdfstrcmp{\theStyle}{empty}=0
                             \newpage
                         \fi
-                        \ifnum\pdfstrcmp{\theStyle}{mainquestion}=0
-                            \newpage
-                        \fi
+                        %\ifnum\pdfstrcmp{\theStyle}{mainquestion}=0
+                        %    \newpage
+                        %\fi
                         %%
                         \DTLgetvalue{\enuna}{opti}{1}{1}
                         \DTLgetvalue{\enunb}{opti}{2}{1}
@@ -457,6 +492,9 @@
                             \renewcommand{\optd}{\permut[\theId,\toint{\optdd}]}
                         \fi
                         %% \vfill %\hspace{-0.5cm}
+                        \ifnum\pdfstrcmp{\theIdOrig}{\theMain}=0
+                            \vspace{12pt}
+                        \fi
                         \vbox{
                                 %
                                 %%% Exam style (overrides general)
@@ -510,13 +548,13 @@
                                         %%
                                         %% QUESTION
                                         %%
-                                        \item \theScore \theLabel \theAppendix ~\\% \opta~\optb~\optc~\optd~/~\theId\\
+                                        \item \theScore \briefname \theLabel \theAppendix% \opta~\optb~\optc~\optd~/~\theId\\
                                         %%
                                         \setlength{\extrarowheight}{0.45cm}
                                         %%
                                         %% ANSWERS
                                         %%
-                                        \vspace{-12pt}
+                                        %\vspace{-12pt}
                                         \begin{adjustwidth}{-44pt}{0pt}
                                         \begin{tabular}{m{1mm} m{\qrwidth} m{0.4\columnwidth} m{1mm} m{\qrwidth} m{0.4\columnwidth}}
                                                 %%
@@ -548,13 +586,13 @@
                                         %%
                                         %% QUESTION
                                         %%
-                                        \item \theScore \theLabel \theAppendix ~\\[10pt]
+                                        \item \theScore \briefname \theLabel \theAppendix
                                         %%
                                         \setlength{\extrarowheight}{0.25cm}
                                         %%
                                         %% ANSWERS
                                         %%
-                                        \vspace{-12pt}
+                                        \vspace{4pt}
                                         \begin{adjustwidth}{-46pt}{0pt}
                                         \begin{tabular}{m{1mm} m{\qrwidth} m{0.8\columnwidth}}
                                                 %%
@@ -576,7 +614,7 @@
                                                 %%%%
                                         \end{tabular}
                                         \end{adjustwidth}
-                                        \vspace{10mm}
+                                        %\vspace{10mm}
                                 \fi
                                 %%
                                 % qstyle = 3 -> open
@@ -585,7 +623,7 @@
                                         %%
                                         %% QUESTION
                                         %%
-                                        \item \theScore \theLabel \theAppendix ~ \\
+                                        \item \theScore \briefname \theLabel \theAppendix \\
                                         %%
                                         \setlength{\extrarowheight}{0.25cm}
                                         %%
@@ -617,13 +655,21 @@
                                         %%
                                         %% QUESTION
                                         %%
-                                        \item \theScore \theLabel \theAppendix ~\\
+                                        \ifnum\pdfstrcmp{\theShowNum}{no}=0
+                                            \item[] \theScore \briefname \theLabel \theAppendix
+                                        \else
+                                            \ifnum\pdfstrcmp{\theShowNum}{none}=0
+                                            \item[]
+                                            \else
+                                                \item \theScore \briefname \theLabel \theAppendix
+                                            \fi
+                                        \fi
                                         %%
                                         \setlength{\extrarowheight}{0.45cm}
                                         %%
                                         %% ANSWERS
                                         %%
-                                        \vspace{-12pt}
+                                        %\vspace{-12pt}
                                         \begin{adjustwidth}{-44pt}{0pt}
                                         \begin{tabular}{m{1mm} m{\qrwidth} m{0.15\columnwidth} m{1mm} m{\qrwidth} m{0.15\columnwidth} m{1mm} m{\qrwidth} m{0.15\columnwidth} m{1mm} m{\qrwidth} m{0.15\columnwidth}}
                                                 %%
@@ -657,7 +703,7 @@
                                         %%
                                         \item \hspace{-7mm}
                                         \begin{tabular}{m{1mm} m{\qrwidth} m{0.9\columnwidth} m{1mm} m{\qrwidth}}
-                                         & \framebox{\matcode {O\uniqueid\two@digits{\theId}}} & \theScore \enuna \\
+                                         & \framebox{\matcode {O\uniqueid\two@digits{\theId}}} & \theScore \briefname\xspace\enuna \\
                                         \end{tabular}\vspace{2mm}
                                         \\ \theLabel %\\ TODO: REMOVED FUNDINF EP1
                                         %%%
@@ -679,14 +725,15 @@
                                 %% qstyle = 7 -> mainquestion
                                 %%
                                 \ifnum\pdfstrcmp{\qstyle}{7}=0
-                                    \item[]
-                                    \theQA
-                                    \begin{flushright}
+                                    \item
+                                    \theQA\\
+                                    %\begin{flushright}
                                     \begin{minipage}{0.965\textwidth}
-                                    \centering
+                                    %\centering
                                     \theLabel
                                     \end{minipage}
-                                    \end{flushright}
+                                    \vspace{6pt}
+                                    %\end{flushright}
                                 \fi
                                 %%
                                 %% qstyle = 8 -> vfillquestion
@@ -696,10 +743,11 @@
                                 \fi
                                 %%
                         }
-                        \vfill
+                        \penalty0\relax%\vfill
                 }
         %%%
         \end{enumerate}
+        %}
         %%%
 }
 
@@ -794,6 +842,91 @@
     \pagestyle{fancy}
 }
 
+
+
+\ExplSyntaxOn
+
+\tl_new:N \l_codebox_height_tl
+\tl_new:N \l_codebox_width_tl
+\tl_set:Nn \l_codebox_width_tl { 0.985\textwidth }
+
+\keys_define:nn { codebox }
+ {
+  height .tl_set:N = \l_codebox_height_tl,
+  height .initial:n = { },
+  width  .tl_set:N = \l_codebox_width_tl,
+  width  .initial:n = { 0.985\textwidth },
+ }
+
+\NewDocumentCommand{\codebox}{O{}m}
+ {
+  \par
+  \group_begin:
+  \keys_set:nn { codebox } { #1 }
+  \fbox{
+    \tl_if_empty:NTF \l_codebox_height_tl
+     {
+      \begin{minipage}{\l_codebox_width_tl}
+     }
+     {
+      \begin{minipage}[t][\l_codebox_height_tl]{\l_codebox_width_tl}
+     }
+    \ttfamily
+    \tl_set:Nn \l_tmpa_tl { #2 }
+    \regex_replace_all:nnN { \*\*\* } { ...<BREAK> } \l_tmpa_tl
+    \regex_replace_all:nnN { @HEADER@ } {-----------------------------su-solución-debajo-de-esta-línea----------------------------<BREAK> } \l_tmpa_tl
+    %\regex_replace_all:nnN { :: } { <LITCOLON> } \l_tmpa_tl
+    %\regex_replace_all:nnN { : } { :<BREAK> } \l_tmpa_tl
+    \regex_replace_all:nnN { ; } { <BREAK> } \l_tmpa_tl
+    \regex_replace_all:nnN { <LITCOLON> } { : } \l_tmpa_tl
+    \seq_set_split:Nne \l_tmpa_seq { <BREAK> } { \tl_use:N \l_tmpa_tl }
+    \seq_remove_all:Nn \l_tmpa_seq { }
+    \seq_set_map:NNn \l_tmpa_seq \l_tmpa_seq { \__codebox_dots_to_space:n {##1} }
+    \seq_use:Nn \l_tmpa_seq { \\ }
+    \end{minipage}
+  }
+  \group_end:
+  \par
+ }
+\cs_new:Npn \__codebox_dots_to_space:n #1
+ {
+  \seq_set_split:Nnn \l_tmpb_seq { ... } { #1 }
+  \exp_not:n { \seq_use:Nn \l_tmpb_seq { \hspace*{2em} } }
+ }
+\ExplSyntaxOff
+
+\newcommand{\usecode}[1]{
+    \begin{center}
+    \vspace{-2mm}
+    \fbox{\rule{0pt}{2ex}
+    \begin{minipage}[t]{0.97\textwidth}
+    \UseVerbatim{#1}
+    \vspace{-3pt}
+    \end{minipage}
+    }
+    \end{center}
+}
+\newcounter{qnc}
+
+
+\newcommand{\addquestion}[1]{%
+  \stepcounter{qnc}%
+  \def\quid{\theqnc}% 
+  \StrBehind{#1}{/}[\brief]%
+  \input{#1}%
+}
+
+\newcommand{\usecodex}{
+    \begin{center}
+    \vspace{-2mm}
+    \fbox{\rule{0pt}{2ex}
+    \begin{minipage}[t]{0.97\textwidth}
+    \UseVerbatim{\brief}
+    \vspace{-3pt}
+    \end{minipage}
+    }
+    \end{center}
+}
 
 
 \endinput

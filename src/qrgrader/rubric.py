@@ -37,14 +37,12 @@ class Rubric(QListWidget):
         self.pd = None
         self.filters = None
         self.exam_id = None
-        self.config = {}
+        self.config = kwargs.get("config")
         self.name = name
 
         self.table_filename = dir_xls + get_date() + "_" + self.name + ".csv"
         self.current_exam_id = None
         self.modified = False
-        self.buttons_height = kwargs.get("buttons_height")
-        self.buttons_font = kwargs.get("buttons_font")
 
         self.setDragDropMode(QAbstractItemView.InternalMove)
         self.setDragEnabled(True)
@@ -74,6 +72,30 @@ class Rubric(QListWidget):
 
     def get_upload_button(self):
         return self.upload_btn
+
+    def flush(self):
+        exams = []
+        schema = {}
+        for button in self.filter_buttons(None): # type: Button
+            exams.extend(button.data.keys())
+            schema[button.get_name()] = {"type": button.get_type()}
+            if button.get_type() == "button":
+                schema[button.get_name()].update({
+                                         "color": button.get_color(),
+                                         "weight": button.get_weight(),
+                                         "steps": button.get_steps(),
+                                         "full": button.get_full_value(),
+                                         "click": int(button.get_click_next())})
+        exams = list(set(exams))
+        scores = {}
+        for exam in exams:
+            if exam not in scores:
+                scores[exam] = {}
+            for button in self.filter_buttons(None): # type: Button
+                data = button.data.get(exam)
+                scores[exam].update({button.get_name(): data})
+
+        print(schema)
 
     # A bit messy should use a worker thread but it works
     # and I don't want to add more complexity right now
@@ -135,6 +157,9 @@ class Rubric(QListWidget):
         return ok
 
     def load_table(self):
+
+        NUM_OF_HEADER_ROWS = 6
+
         if os.path.exists(self.table_filename):
             table = pandas.read_csv(self.table_filename, sep="\t", header=0, index_col=0)
             table = table.fillna("")
@@ -142,25 +167,31 @@ class Rubric(QListWidget):
             for name in table.columns:
                 kind = table.loc["type", name]
                 color = table.loc["color", name]
+                weight = table.loc["weight", name]
+                full = table.loc["full", name]
+                steps = table.loc["steps", name]
+                click_next = table.loc["click", name]
                 if kind == 'button':
-                    weight = float(table.loc["weight", name])
-                    full = float(table.loc["full", name])
-                    steps = int(table.loc["steps", name])
-                    button = StepButton(name, weight=weight, full_value=full, steps=steps, color=color)
+                    button = StepButton(name,
+                                        weight=float(weight),
+                                        full_value=float(full),
+                                        steps=int(steps),
+                                        color=color,
+                                        click_next=int(click_next))
                     button.score_changed.connect(self.button_clicked)
                 elif kind == 'text':
                     button = TextButton(name)
                 elif kind == 'cutter':
-                    button = CutterButton(name)
+                    button = CutterButton(name, percent=float(full),  color=color)
                     button.score_changed.connect(self.button_clicked)
                 elif kind == 'multiplier':
-                    button = MultiplierButton(name)
+                    button = MultiplierButton(name,percent=float(full),  color=color)
                     button.score_changed.connect(self.button_clicked)
                 elif kind == 'separator':
                     button = Separator(name)
                 elif kind == 'shortcut':
                     buttons = table.loc["full", name]
-                    button = Shortcut(name, buttons=buttons.split(";"))
+                    button = Shortcut(name, buttons=buttons.split(";"), color=color)
                     button.clicked.connect(self.shortcut_activated)  # type: ignore
                 else:
                     button = None
@@ -170,10 +201,13 @@ class Rubric(QListWidget):
                     self.addItem(item)
                     self.setItemWidget(item, button)
                     item.setSizeHint(button.sizeHint())
-                    for exam_id in table.index[5:]:
-                        value = table.loc[exam_id, name]
-                        value = -1 if value == "" else int(value)
-                        button.insert(int(exam_id), value)
+
+                    for exam_id in table.index[NUM_OF_HEADER_ROWS:]:
+                        value = table.loc[exam_id, name] or ""
+                        if button.get_type() in ["button", "cutter", "multiplier"]:
+                            value = -1 if value == "" else float(value)*100
+                        if button.get_type() in ["button", "cutter", "multiplier", "text"]:
+                            button.insert(int(exam_id), value)
 
 
     def push(self, exam_id):
@@ -230,8 +264,7 @@ class Rubric(QListWidget):
         self.button_or_value_changed.emit()
 
     def get_dialog(self, button=None):
-
-        dialog = ButtonEditDialog(self, button, None)
+        dialog = ButtonEditDialog(self, button, [button.get_name() for button in self.filter_buttons(None)])
 
         if not dialog.exec():
             return None
@@ -295,17 +328,41 @@ class Rubric(QListWidget):
 
     def save_xls(self):
         df = pandas.DataFrame()
-        for button in self.filter_buttons(StepButton):
+        for button in self.filter_buttons(None):
             df[button.get_name()] = pandas.NA
             df.loc['type', button.get_name()] = button.get_type()
-            df.loc['color', button.get_name()] = button.get_color()
-            df.loc['weight', button.get_name()] = button.get_weight()
-            df.loc['steps', button.get_name()] = button.get_steps()
-            df.loc['full', button.get_name()] = button.get_full_value()
+
+            df.loc['color', button.get_name()] = ""
+            df.loc['weight', button.get_name()] = ""
+            df.loc['steps', button.get_name()] = ""
+            df.loc['full', button.get_name()] = ""
+            df.loc['click', button.get_name()] = ""
+
+            if button.get_type() in ["button","cutter","multiplier", "shortcut"]:
+                df.loc['color', button.get_name()] = button.get_color()
+
+            if button.get_type() == "button":
+                df.loc['weight', button.get_name()] = button.get_weight()
+                df.loc['steps', button.get_name()] = button.get_steps()
+                df.loc['full', button.get_name()] = button.get_full_value()
+                df.loc['click', button.get_name()] = int(button.get_click_next())
+
+            if button.get_type() in ["cutter","multiplier"]:
+                df.loc['full', button.get_name()] = button.get_percent()
+            if button.get_type() == "shortcut":
+                df.loc['full', button.get_name()] = ";".join(button.get_buttons())
+
             for exam_id in button.data:
                 value = button.query(exam_id)
-                df.loc[exam_id, button.get_name()] = str(value) if value > 0 else ""
+                if button.get_type() in ["button", "cutter", "multiplier"]:
+                    print(button.get_name(), value, "dDD")
+                    df.loc[exam_id, button.get_name()] = f"{value/100:g}" if value > 0 else ""
+                else:# button.get_type() == "text":
+                    df.loc[exam_id, button.get_name()] = str(value)
+
         df.to_csv(self.table_filename, sep="\t", index=True)
+
+        self.flush()
 
 
 
@@ -387,20 +444,12 @@ class Rubric(QListWidget):
             b2 = Shortcut(text, buttons=buttons)
             b2.clicked.connect(self.shortcut_activated)  # type: ignore
 
-            self.table[text] = ""
-            self.table.loc["type", text] = "shortcut"
-            self.table.loc["color", text] = b2.get_color()
-            self.table.loc["full", text] = ";".join(buttons)
-            self.table.loc["steps", text] = "0"
-            self.table.loc["weight", text] = "0.0"
-
             item = QListWidgetItem()
             self.addItem(item)
             self.setItemWidget(item, b2)
             item.setSizeHint(b2.sizeHint())
             item.setFlags(item.flags() & ~Qt.ItemIsDragEnabled)
             self.schema_changed()
-            print(self.table)
 
     #
     def delete_button(self, position):
@@ -488,6 +537,7 @@ class Rubric(QListWidget):
     def store(self, exam_id):
         assessed = False
         for button in self.filter_buttons(StateButton):  # type: Score
+            print("rrr", button.get_name())
             assessed = button.store(exam_id) > 0 or assessed
 
         self.save_xls()
@@ -495,7 +545,12 @@ class Rubric(QListWidget):
 
 
     def assessed(self, exam_id):
-        return False
+        assessed = False
+        for button in self.filter_buttons(StepButton):  # type: Score
+            assessed = button.query(exam_id) > 0 or assessed
+        for button in self.filter_buttons(TextButton):  # type: Score
+            assessed = len(button.query(exam_id)) > 0 or assessed
+        return assessed
 
     def retrieve(self, exam_id):
         self.current_exam_id = exam_id
@@ -529,7 +584,7 @@ class Rubric(QListWidget):
         for i in range(self.count()):
             item = self.item(i)
             widget = self.itemWidget(item)
-            if isinstance(widget, kind):
+            if kind is None or isinstance(widget, kind):
                 buttons.append(widget)
         return buttons
 

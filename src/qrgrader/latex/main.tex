@@ -4,12 +4,14 @@
 
 \begin{document}
 
-    \IDMatrix{0.6cm}{\uniqueid}{Student ID figure}
+    \IDMatrix{0.6cm}{\uniqueid}{Student ID figure}{5}
 
-    \begin{exam}[shuffle=off, style=matrix, showcorrect=no, encode=yes]
+    \begin{exam}[shuffle=all, style=matrix, showcorrect=no, encode=yes]
 
-        \question[score=0.5, penalty=0.125, brief=first]{1}
-        {Stem 1}
+        \question[score=0.5, penalty=0.125, brief=first, correct=ab]{1}
+        {
+            Stem 1
+        }
 %%
         {Key}
 %%
@@ -40,7 +42,7 @@
         {Distractor 2}
 %%
         {Distractor 3}
-
+%
         \question[score=0.5, penalty=0.125, brief=fourth, style=list]{4}
         {Stem 4}
 %%
@@ -51,8 +53,82 @@
         {Distractor 2}
 %%
         {Distractor 3}
+%
+        \question[score=0.5, penalty=0.125, brief=fourth, style=horizontal, main=5, type=M]{5}
+        {Stem 5}
+%%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
 
-        \develquestion[score=1]{5}{
+        \subquestion[score=0.5, penalty=0.125, brief=fourth, style=horizontal, main=5, type=M]{6}%
+        {Substem 5-1}
+%%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+%
+        \subanswer[score=0.5, penalty=0.125, brief=fourth, style=horizontal, main=5, type=M]{7}%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+
+        \stem{100}{Title of the Stem}{Stem 6}
+%
+        \subquestion[score=0.5, penalty=0.125, brief=fourth, style=horizontal, main=100, type=M]{8}%
+        {Substem 6-1}
+%%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+%
+        \subanswer[score=0.5, penalty=0.125, brief=fourth, style=horizontal, main=100, type=M]{9}%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+%
+        \subanswer[score=0.5, penalty=0.125, brief=fourth, style=horizontal, main=100, type=M]{11}%
+        {Keyrrr}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+%
+        \question[score=0.5, penalty=0.125, brief=third, style=list]{13}
+        {Stem 34444}
+%%
+        {Key}
+%%
+        {Distractor 1}
+%%
+        {Distractor 2}
+%%
+        {Distractor 3}
+%
+%
+        \develquestion[score=1]{10}{
             \textbf{Open question}
         }
         {

@@ -33,7 +33,8 @@ from qrgrader.common import StudentsData, Nia, get_workspace_paths, get_date
 # ──────────────────────────────────────────────
 SMTP_SERVER   = "smtp.gmail.com"        # Gmail. Outlook: smtp.office365.com
 SMTP_PORT     = 587
-
+REMITENTE     = "dantard@unizar.es"
+CONTRASENA    = "ibadwgsoirmfvngs"  # Ver nota al final
 # ──────────────────────────────────────────────
 
 
@@ -130,7 +131,6 @@ def main():
             email = students.get_email(nia).strip()
             alumno = master.copy()
             alumno["email"] =  f"{email}"
-            alumno["email"] = "dantard@unizar.es"
             alumno["ficheros"] = [f"{dir_publish}{exam_id}.pdf"]
             alumno["texto"] = alumno["texto"].replace("{name}", name)
             alumno["asunto"] = alumno["asunto"].replace("{name}", name)

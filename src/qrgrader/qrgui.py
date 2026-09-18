@@ -92,9 +92,9 @@ class MainWindow(QMainWindow):
         self.locked = args["lock"]
         self.config = EasyConfig2(filename=os.path.expanduser("~") + os.sep + ".config/qrgrader/qrgrader.yaml")
         self.cfg_geometry = self.config.root().addPrivate("geometry", default=[0, 0, 1200, 1000, False])
-        self.cfg_buttons_height = self.config.root().addPrivate("buttons_height")
-        self.cfg_buttons_font = self.config.root().addPrivate("buttons_font")
+        self.rubric_config = self.config.root().addPrivate("rubric_config", default={})
         self.config.load()
+
 
         self.multiple_marked_exams = SortedSet()
         self.auto_avance = False
@@ -438,6 +438,7 @@ class MainWindow(QMainWindow):
              self.isFullScreen()])
         self.config.save()
 
+
     def load_detected(self):
         self.detected.load(self.dir_data + self.prefix + "detected.csv")
         # Pre-select codes to improve performance
@@ -487,8 +488,10 @@ class MainWindow(QMainWindow):
             print("fukenameo", filename)
 
             name = os.path.basename(filename).replace(".scm", "")
-            r1 = Rubric(filename, self.dir_xls, buttons_height=self.cfg_buttons_height.get(),
-                        buttons_font=self.cfg_buttons_font.get())
+            if self.rubric_config.get_value().get(filename) is None:
+                self.rubric_config.get_value()[filename]= {}
+
+            r1 = Rubric(filename, self.dir_xls, config=self.rubric_config.get_value().get(filename,{}))
             r1.score_changed.connect(self.rubric_score_changed)
             r1.button_or_value_changed.connect(self.rubric_button_or_value_changed)
             r1.goto_next.connect(self.goto_next)
@@ -907,7 +910,7 @@ def main():
             print("WARNING: schema MUST NOT be a yaml file.")
             sys.exit(1)
 
-        filename = schema.replace(".scm", "") + ".scm"
+        filename = schema
 
         # if not os.path.exists(filename):
         #     if args["create"]:

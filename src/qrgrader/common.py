@@ -83,15 +83,19 @@ class Questions:
 
     def load(self):
         if os.path.exists(self.filename):
-            self.questions = pandas.read_csv(self.filename, sep='\t', header=0, index_col=0)
+            self.questions = pandas.read_csv(self.filename, sep='\t', header=0, index_col='ID')
             return True
         return False
 
-    def get_text(self, question):
+    def get_brief(self, question):
         return self.questions.loc[question, "BRIEF"]
 
     def get_value(self, question, answer):
-        return self.questions.loc[question, chr(answer + 64)]
+        if type(answer) == str:
+            return self.questions.loc[question, answer]
+        else:
+            return self.questions.loc[question, chr(answer + 64)]
+
 
     def get_type(self, question):
         return self.questions.loc[question, "TYPE"]
@@ -99,6 +103,8 @@ class Questions:
     def get_questions(self):
         return self.questions.index.tolist()
 
+    def get_main(self, question):
+        return int(self.questions.loc[question, "MAIN"])
 
 class Generated(CodeSet):
 
@@ -223,7 +229,7 @@ class Nia:
     def load(self, type_n=None):
         if type_n is not None:
             self.codes = type_n
-        self._process()
+        return self._process()
 
     def _process(self):
         self.nia.clear()

@@ -7,6 +7,8 @@ from itertools import accumulate
 from multiprocessing import Manager, Pool, Process
 from random import randint
 
+import numpy as np
+
 import qrgrader.utils as utils
 import cv2
 import pandas as pd
@@ -118,7 +120,6 @@ def main():
 
         codes.save(dir_data + prefix + "detected.csv")
 
-
     if (simulate := args.get("simulate")) > 0:
         print("Simulation in progress ({} files)".format(simulate))
         makedir(dir_scanned, clear=True)
@@ -182,6 +183,12 @@ def main():
         print("\nSimulation done.")
 
     if args.get("scan", False):
+        if os.path.exists(dir_temp_scanner):
+            resp = input("Temp directory exists. Delete everything (Y/n)? ")
+            if resp.upper() == "N":
+                sys.exit(0)
+            shutil.rmtree(dir_temp_scanner, ignore_errors=True)
+
         os.makedirs(dir_temp_scanner, exist_ok=True)
 
         first_page = args.get("begin")
@@ -367,13 +374,19 @@ def main():
         num_open = 0
         for question in questions.get_questions():
             if questions.get_type(question) == "Q":
-                names.extend([questions.get_text(question), "", "", percent_ques])
+                names.extend([questions.get_brief(question), "", "", percent_ques])
                 qn.extend([question, question, question, question])
                 ans_value.extend([questions.get_value(question, i + 1) for i in range(4)])
                 ans_letter.extend([chr(65 + i) for i in range(4)])
                 ans_perc.extend([percent_answ] * 4)
+            elif questions.get_type(question) == "M":
+                names.extend([questions.get_brief(question), "", "", percent_ques])
+                qn.extend([question, question, question, question])
+                ans_value.extend([questions.get_value(question, i + 1) for i in range(4)])
+                ans_letter.extend(["M" + str(questions.get_main(question)) + "-" + chr(65 + i) for i in range(4)])
+                ans_perc.extend([percent_answ] * 4)
             else:
-                names.append(questions.get_text(question))
+                names.append(questions.get_brief(question))
                 qn.append(question)
                 ans_letter.append("O")
                 ans_value.append(questions.get_value(question, 1))
@@ -401,8 +414,14 @@ def main():
 
         # insert columns for the grade and the Q score
         df.insert(2, "Q", "")
-        df.loc[hdr + 1:, "Q"] = '=max(0,SUMPRODUCT((INDIRECT(ADDRESS(3, COLUMN() + 3) & ":" & ADDRESS(3, COLUMNS($A$1:$1)))<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" & ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" & ADDRESS(4, COLUMNS($A$1:$1)))))' #'=max(0,SUMPRODUCT(($G$3:$3<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" & ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" & ADDRESS(4, COLUMNS($A$1:$1)))))'
-        # insert columns for the grade and the Q score
+        # COMMENTED DUE TO INTRODUCTION OF MULTIPLE
+        # df.loc[hdr + 1:, "Q"] = '=max(0,SUMPRODUCT((INDIRECT(ADDRESS(3, COLUMN() + 3) & ":" & ADDRESS(3, COLUMNS($A$1:$1)))<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" & ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" & ADDRESS(4, COLUMNS($A$1:$1)))))' #'=max(0,SUMPRODUCT(($G$3:$3<>"O") *INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" & ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" & ADDRESS(4, COLUMNS($A$1:$1)))))'
+
+        df.loc[hdr + 1:, "Q"] ='''=MAX(0,SUMPRODUCT(
+            NOT(REGEXMATCH(INDIRECT(ADDRESS(3, COLUMN() + 3) & ":" & ADDRESS(3, COLUMNS($A$1:$1))), "^(O$|M)")) *
+            INDIRECT(ADDRESS(ROW(), COLUMN() + 3) & ":" & ADDRESS(ROW(), COLUMNS($A$1:$1))) *
+            INDIRECT(ADDRESS(4, COLUMN() + 3) & ":" & ADDRESS(4, COLUMNS($A$1:$1)))
+        ))'''
 
         df.insert(3, "O", "")
         df.loc[hdr + 1:, "O"] = '=SUMPRODUCT((INDIRECT(ADDRESS(3, COLUMN()+2) & ":" & ADDRESS(3, COLUMNS($A$1:$1)))="O") * INDIRECT(ADDRESS(ROW(), COLUMN() + 2) & ":" & ADDRESS(ROW(), COLUMNS($A$1:$1)))* INDIRECT(ADDRESS(4, COLUMN() + 2) & ":" & ADDRESS(4, COLUMNS($A$1:$1))))'
@@ -431,6 +450,25 @@ def main():
             df.loc[int(exam_id), "SEC"] = str(students_data.get_group(num_nia) if num_nia is not None else "")
 
         df.iloc[hdr, 0:8] = ["EXAM", "#", "NIA", "NAME", "SEC", "Q", "O", "T"]
+
+        ########### ADD MULTIPLE SCORE
+        mains = set()
+        for question in questions.get_questions():
+            if questions.get_type(question) == "M":
+                mains.add(questions.get_main(question))
+        row = df.iloc[2]
+        for main in mains:
+            penalty = np.where(row.values == f"M{main}-D")[0][0]
+            for a in ['A', 'B', 'C']:
+                col_positions = np.where(row.values == f"M{main}-{a}")[0]
+                if float(df.iloc[3, col_positions[0]]) > 0:
+                    multip = "1"
+                    for cp in col_positions:
+                        multip += f'* INDIRECT(ADDRESS(ROW(), {cp+1}))'
+                    multip = (f' + if({multip}>0,INDIRECT(ADDRESS(4, {col_positions[0]+1})),'
+                              f'if(SUM(INDIRECT(ADDRESS(ROW(), {col_positions[0]+1}) & ":" & ADDRESS(ROW(), {col_positions[-1]+1})))>0, INDIRECT(ADDRESS(4, {penalty+1})),0))')
+                    df.loc[hdr + 1:, "Q"] = df.loc[hdr + 1:, "Q"] + multip
+        ########### ADD MULTIPLE SCORE
 
         df.to_csv(table_filename, sep='\t', index=False, header=False)
 
