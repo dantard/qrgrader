@@ -355,33 +355,49 @@ class Rubric(QListWidget):
             for exam_id in button.data:
                 value = button.query(exam_id)
                 if button.get_type() in ["button", "cutter", "multiplier"]:
-                    print(button.get_name(), value, "dDD")
                     df.loc[exam_id, button.get_name()] = f"{value/100:g}" if value > 0 else ""
-                else:# button.get_type() == "text":
+                else:
                     df.loc[exam_id, button.get_name()] = str(value)
+
+        df.insert(0, "Score", "")
+        df.fillna("", inplace=True)
+
+        full = next(i for i, x in enumerate(df.index) if x == "full") + 2
+        weight = next(i for i, x in enumerate(df.index) if x == "weight") + 2
+
+        button_col_idx = df.columns.get_indexer(df.columns[df.loc["type"] == "button"])
+        multiplier_col_idx = df.columns.get_indexer(df.columns[df.loc["type"] == "multiplier"])
+        cutter_col_idx = df.columns.get_indexer(df.columns[df.loc["type"] == "cutter"])
+
+        denominator = "/sumif({0"
+        for col in button_col_idx:
+            denominator += "," + rowcol_to_a1(weight, int(col) + 2) +"*" + rowcol_to_a1(full, int(col) + 2)
+        denominator += '}, ">0")'
+
+        for row, exam_id in enumerate(df.index.tolist()):
+            if str(exam_id).isdigit():
+                numer = "(0"
+                for col in button_col_idx:
+                    numer += "+" + rowcol_to_a1(row + 2, int(col) + 2) + "*" + rowcol_to_a1(full, int(col) + 2)
+                numer += ")"
+                multiplier = ""
+                for col in multiplier_col_idx:
+                    multiplier += "*if(" + rowcol_to_a1(row + 2, int(col) + 2) + ">0," + rowcol_to_a1(full, int(col) + 2) + ",1)"
+
+                formula = numer + denominator + multiplier
+                for col in cutter_col_idx:
+                    cell = rowcol_to_a1(row + 2, int(col) + 2)
+                    limit = rowcol_to_a1(full, int(col) + 2)
+                    formula = f"LET(x,{formula},IF({cell}>0,MIN(x,{limit}),x))"
+
+
+                df.loc[exam_id, "Score"] = "=" + formula
+
+
 
         df.to_csv(self.table_filename, sep="\t", index=True)
 
         self.flush()
-
-
-
-        # idx = self.table.columns.get_indexer(self.table.columns[self.table.loc["type"] == "button"])
-        #
-        # denominator = "/sumif({0"
-        # for col in idx:
-        #     denominator += "," + rowcol_to_a1(5, int(col) + 2) +"*" + rowcol_to_a1(6, int(col) + 2)
-        # denominator += '}, ">0")'
-        #
-        # for row, exam_id in enumerate(self.table.index.tolist()):
-        #     if row > 4:
-        #         numer = "=(0"
-        #         for col in idx:
-        #             numer += "+" + rowcol_to_a1(row + 2, int(col) + 2) + "*" + rowcol_to_a1(5, int(col) + 2)
-        #         numer += ")"
-        #         self.table.loc[exam_id, "Score"] = numer + denominator
-        #
-        # self.table.to_csv(self.table_filename, sep="\t", index=True)
 
     def compute_score(self, exam_id):
         total = 0
