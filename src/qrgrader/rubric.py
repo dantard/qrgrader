@@ -167,10 +167,10 @@ class Rubric(QListWidget):
             for name in table.columns:
                 kind = table.loc["type", name]
                 color = table.loc["color", name]
-                weight = table.loc["weight", name]
-                full = table.loc["full", name]
                 steps = table.loc["steps", name]
                 click_next = table.loc["click", name]
+                weight = table.loc["weight", name]
+                full = table.loc["full", name]
                 if kind == 'button':
                     button = StepButton(name,
                                         weight=float(weight),
@@ -331,24 +331,25 @@ class Rubric(QListWidget):
         for button in self.filter_buttons(None):
             df[button.get_name()] = pandas.NA
             df.loc['type', button.get_name()] = button.get_type()
-
             df.loc['color', button.get_name()] = ""
-            df.loc['weight', button.get_name()] = ""
             df.loc['steps', button.get_name()] = ""
-            df.loc['full', button.get_name()] = ""
             df.loc['click', button.get_name()] = ""
+            df.loc['weight', button.get_name()] = ""
+            df.loc['full', button.get_name()] = ""
+
 
             if button.get_type() in ["button","cutter","multiplier", "shortcut"]:
                 df.loc['color', button.get_name()] = button.get_color()
 
             if button.get_type() == "button":
-                df.loc['weight', button.get_name()] = button.get_weight()
+                df.loc['weight', button.get_name()] = f"{button.get_weight():g}"
                 df.loc['steps', button.get_name()] = button.get_steps()
-                df.loc['full', button.get_name()] = button.get_full_value()
+                df.loc['full', button.get_name()] = f"{button.get_full_value():g}"
                 df.loc['click', button.get_name()] = int(button.get_click_next())
 
             if button.get_type() in ["cutter","multiplier"]:
-                df.loc['full', button.get_name()] = button.get_percent()
+                df.loc['full', button.get_name()] = f"{button.get_percent():g}"
+
             if button.get_type() == "shortcut":
                 df.loc['full', button.get_name()] = ";".join(button.get_buttons())
 
@@ -356,6 +357,8 @@ class Rubric(QListWidget):
                 value = button.query(exam_id)
                 if button.get_type() in ["button", "cutter", "multiplier"]:
                     df.loc[exam_id, button.get_name()] = f"{value/100:g}" if value > 0 else ""
+                elif button.get_type() == "separator":
+                    pass
                 else:
                     df.loc[exam_id, button.get_name()] = str(value)
 
