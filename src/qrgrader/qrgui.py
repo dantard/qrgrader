@@ -549,8 +549,6 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(100, delayed)
 
     def update_scores_layout(self):
-        # TODO
-        return
         total = 0
         quiz_score, full_score = self.get_quiz_score(self.current_exam)
         if full_score != 0:
@@ -649,6 +647,13 @@ class MainWindow(QMainWindow):
         # Not updating the scores here, as it is done somewhere else
         # self.update_all_pdf_tree_scores()
 
+    def create_mark(self, code, index, marks):
+        r = Mark(code)
+        r.signal.double_click.connect(self.code_clicked)
+        r.setParentItem(self.swik.view.get_page(index))
+        marks[code] = r
+        return r
+
     def process_exam(self):
         marks = [x for x in self.swik.view.items() if isinstance(x, Mark)]
 
@@ -658,23 +663,76 @@ class MainWindow(QMainWindow):
 
         marks = {}
         exam_id = self.current_exam % 1000
+        self.apply_marks(exam_id, marks)
+        self.paint_multiple_marks(exam_id, marks)
 
+    def apply_marks(self, exam_id, marks):
         for index in range(self.swik.renderer.get_document_length()):
             page_codes_type_a = self.type_a.select(exam=exam_id, pdf_page=index + 1)
-            # type_a = page_codes.select(type=Code.TYPE_A)
-            for code in page_codes_type_a:
-                r = Mark(code)
-                r.signal.double_click.connect(self.code_clicked)
-                r.setParentItem(self.swik.view.get_page(index))
-                marks[code] = r
-                if code.marked:
-                    if self.xls_questions.get_value(code.question, code.answer) > 0:
-                        r.setPen(QPen(Qt.green, 2))
-                    else:
-                        r.setPen(QPen(Qt.red, 2))
+            questions_in_this_page = set(code.question for code in page_codes_type_a)
+
+            m_questions, q_questions = {}, []
+            for qn in questions_in_this_page:
+                if self.xls_questions.get_type(qn) == "M":
+                    main = self.xls_questions.get_main(qn)
+                    m_questions[main] = m_questions.get(main, [])
+                    m_questions[main].append(qn)
                 else:
-                    if self.changed.get(code) is not None:
-                        r.setPen(QPen(Qt.cyan, 2))
+                    q_questions.append(qn)
+
+            for qn in q_questions:
+                for answer in [1,2,3,4]:
+                    code = page_codes_type_a.select(question=qn, answer=answer).first()
+                    r = self.create_mark(code, index, marks)
+                    if code.marked:
+                        if self.xls_questions.get_value(code.question, code.answer) > 0:
+                            r.setPen(QPen(Qt.green, 2))
+                        else:
+                            r.setPen(QPen(Qt.red, 2))
+                    else:
+                        if self.changed.get(code) is not None:
+                            r.setPen(QPen(Qt.cyan, 2))
+
+            for qg in m_questions.values():
+                m_marks, marked_codes = [], []
+                for qn in qg:
+                    for answer in [1,2,3,4]:
+                        code = page_codes_type_a.select(question=qn, answer=answer).first()
+                        r = self.create_mark(code, index, marks)
+                        if code.marked:
+                            marked_codes.append(r)
+                            m_marks.append(answer)
+                        elif self.changed.get(code) is not None:
+                            r.setPen(QPen(Qt.cyan, 2))
+
+                if (len(m_marks) == len(qg)
+                        and len(set(m_marks)) == 1
+                        and self.xls_questions.get_value(qg[0], set(m_marks).pop())>0):
+                    for r in marked_codes:
+                        r.setPen(QPen(Qt.green, 2))
+                else:
+                    for r in marked_codes:
+                        r.setPen(QPen(Qt.red, 2))
+
+            # for code in page_codes_type_a: #type: Code
+            #     m_or_q = self.xls_questions.get_type(code.question)
+            #     if m_or_q == "M":
+            #         main = self.xls_questions.get_main(code.question)
+            #         if self.xls_questions.get_value(code.question, code.answer) > 0:
+            #         print(f"Processing code: {code.data}, Type: {m_or_q}, Main: {main}, Marked: {code.marked}, {self.xls_questions.get_questions_by_main(main)}")
+            #
+            #     r = Mark(code)
+            #     r.signal.double_click.connect(self.code_clicked)
+            #     r.setParentItem(self.swik.view.get_page(index))
+            #     marks[code] = r
+            #     if code.marked:
+            #         if self.xls_questions.get_value(code.question, code.answer) > 0:
+            #             r.setPen(QPen(Qt.green, 2))
+            #         else:
+            #             r.setPen(QPen(Qt.red, 2))
+            #     else:
+            #         if self.changed.get(code) is not None:
+            #             r.setPen(QPen(Qt.cyan, 2))
 
             page_codes_type_n = self.type_n.select(exam=exam_id, pdf_page=index + 1)
             for code in page_codes_type_n:
@@ -684,6 +742,7 @@ class MainWindow(QMainWindow):
                 if code.marked:
                     r.setPen(QPen(Qt.magenta, 2))
 
+    def paint_multiple_marks(self, exam_id, marks):
         yellow = self.get_multiple_marks(exam_id)
         for answer in yellow:
             marks[answer].setPen(QPen(Qt.yellow, 2))
@@ -761,11 +820,53 @@ class MainWindow(QMainWindow):
         score = 0
         full_value = 0
         exam_codes = self.type_a.select(exam=exam_id % 1000)
-        for code in exam_codes:
-            value = self.xls_questions.get_value(code.question, code.answer)
-            full_value += value if value > 0 else 0
-            if code.marked:
+
+        questions_in_this_exam = set(code.question for code in exam_codes)
+
+        m_questions, q_questions = {}, []
+        for qn in questions_in_this_exam:
+            if self.xls_questions.get_type(qn) == "M":
+                main = self.xls_questions.get_main(qn)
+                m_questions[main] = m_questions.get(main, [])
+                m_questions[main].append(qn)
+            else:
+                q_questions.append(qn)
+
+        for qn in q_questions:
+            for answer in [1,2,3,4]:
+                code = exam_codes.select(question=qn, answer=answer).first()
+                value = self.xls_questions.get_value(code.question, code.answer)
+                full_value += value if value > 0 else 0
+                if code.marked:
+                    score += value
+            print("jjj",qn, score, full_value)
+
+
+        for qg in m_questions.values():
+            m_marks, marked_codes = [], []
+            for qn in qg:
+                for answer in [1,2,3,4]:
+                    code = exam_codes.select(question=qn, answer=answer).first()
+                    if code.marked:
+                        m_marks.append(answer)
+
+            full_value += self.xls_questions.get_value(qg[0], 1)
+
+            if len(m_marks) == len(qg) and len(set(m_marks)) == 1:
+                answer = set(m_marks).pop()
+                value = self.xls_questions.get_value(qg[0], answer)
                 score += value
+            else:
+                value = self.xls_questions.get_value(qg[0], 4)
+                score += value
+
+            print("jjj",qg, score, full_value)
+
+        # for code in exam_codes:
+        #     value = self.xls_questions.get_value(code.question, code.answer)
+        #     full_value += value if value > 0 else 0
+        #     if code.marked:
+        #         score += value
         score = max(score, 0)  # Ensure score is not negative
         score = round(score, 4)  # Round to 4 decimal places
         return score, full_value

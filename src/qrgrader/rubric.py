@@ -11,7 +11,6 @@ from PyQt5.QtWidgets import (QListWidget,
                              QAbstractItemView, QListWidgetItem, QMenu, QMessageBox,
                              QInputDialog, QColorDialog, QPushButton, QWidget, QVBoxLayout, QFrame, QProgressDialog,
                              QApplication)
-from cffi.cffi_opcode import PRIM_INT8
 from gspread.utils import a1_to_rowcol, rowcol_to_a1
 
 from qrgrader.common import get_date, get_workspace_path
@@ -19,7 +18,6 @@ from qrgrader.common import get_date, get_workspace_path
 from qrgrader.dialogs import ButtonEditDialog, RubricEditDialog
 from qrgrader.buttons import StepButton, Shortcut, Button, TextButton, StateButton, Separator, CutterButton, MultiplierButton
 from qrgrader.filter_dialog import FilterDialog
-import qrgrader.qrsheets as qrsheets
 
 from qrgrader.gdrive import Sheets
 from qrgrader.utils import run_with_progress, get_pd

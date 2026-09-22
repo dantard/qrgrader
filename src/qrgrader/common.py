@@ -106,6 +106,9 @@ class Questions:
     def get_main(self, question):
         return int(self.questions.loc[question, "MAIN"])
 
+    def get_questions_by_main(self, main):
+        return self.questions[self.questions["MAIN"] == main].index.tolist()
+
 class Generated(CodeSet):
 
     def __init__(self, ppm):
