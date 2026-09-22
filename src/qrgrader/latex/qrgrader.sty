@@ -74,7 +74,7 @@
 \def\restofpage{\dimexpr\pagegoal-\pagetotal-\baselineskip\relax}
 
 % Collect parameters
-\ifcsdef{uniqueid}{}{\newcommand{\uniqueid}{190822072}}
+\ifcsdef{uniqueid}{}{\newcommand{\uniqueid}{072}}
 \newcommand{\qstyle}{2}
 
 \newcommand{\toint}[1]{\the\numexpr #1 \relax}
@@ -259,7 +259,7 @@
     \question[shownum=none,#1]{#2}{}{#3}{#4}{#5}{#6}
 }
 
-\newkeycommand*\stem[brief=][3]
+\newkeycommand*\stem[brief=, score=, penalty=, brief=, correct={a}, main=][3]
 {       \setexamid{\uniqueid}
         \pgfmathsetseed{\numexpr #1 * 1 + \examid \relax}
         \pgfmathparse{random(100,999)}
@@ -274,6 +274,11 @@
             \DTLnewdbentry{list}{value}{\tentimes}
         \dtlnoexpandnewvalue
         \expandafter\xdef\csname rnd \theqn\endcsname{\the\numexpr\pgfmathresult*1\relax}
+%        \typeout{;;;#1;;S;;\commandkey{correct};;
+%        \ifcommandkey{score}{\commandkey{score}}{0};;
+%        \ifcommandkey{penalty}{-\commandkey{penalty}}{0};;
+%        \ifcommandkey{brief}{\commandkey{brief}}{Empty};;
+%        \ifcommandkey{main}{\commandkey{main}}{#1};;;}
 }
 
 \newkeycommand*\vfillquestion[main=][1]
@@ -559,19 +564,19 @@
                                         \begin{tabular}{m{1mm} m{\qrwidth} m{0.4\columnwidth} m{1mm} m{\qrwidth} m{0.4\columnwidth}}
                                                 %%
                                                 \adjustbox{valign=m}{a)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode {\uniqueid\two@digits{\theId}\opta}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\opta}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[t]{7cm}\enuna\end{minipage}} &
                                                 %%%%
                                                 \adjustbox{valign=m}{b)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optb}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\optb}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[t]{7cm}\enunb\end{minipage}}\\
                                                 %%%%
                                                 \adjustbox{valign=m}{c)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optc}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\optc}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[t]{7cm}\enunc\end{minipage}} &
                                                 %%%%
                                                 \adjustbox{valign=m}{d)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optd}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\optd}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[t]{7cm}\enund\end{minipage}}\\
                                                 %%%%
                                         \end{tabular}
@@ -597,19 +602,19 @@
                                         \begin{tabular}{m{1mm} m{\qrwidth} m{0.8\columnwidth}}
                                                 %%
                                                 \adjustbox{valign=m}{a)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\opta}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\opta}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[t]{0.88\columnwidth}\enuna \end{minipage}} \\[10pt]
                                                 %%%
                                                 \adjustbox{valign=m}{b)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optb}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\optb}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[t]{0.88\columnwidth}\enunb\end{minipage}} \\[10pt]
                                                 %%%
                                                 \adjustbox{valign=m}{c)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optc}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\optc}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[t]{0.88\columnwidth}\enunc\end{minipage}} \\[10pt]
                                                 %%%
                                                 \adjustbox{valign=m}{d)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optd}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\optd}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[t]{0.88\columnwidth}\enund\end{minipage}} \\[10pt]
                                                 %%%%
                                         \end{tabular}
@@ -635,14 +640,14 @@
                                                     %%
                                                     %% SCORE %% Here theQA is used to contain the number of the second question
                                                     \parbox[u]{3.2cm}{Reservado profesores\\No marque ningún QR} &
-                                                    \framebox{\matcode{\uniqueid\two@digits{\theId}1}} &
-                                                    \framebox{\matcode{\uniqueid\two@digits{\theId}2}} &
-                                                    \framebox{\matcode{\uniqueid\two@digits{\theId}3}} &
-                                                    \framebox{\matcode{\uniqueid\two@digits{\theId}4}} &
-                                                    \framebox{\matcode{\uniqueid\two@digits{\theQA}1}} &
-                                                    \framebox{\matcode{\uniqueid\two@digits{\theQA}2}} &
-                                                    \framebox{\matcode{\uniqueid\two@digits{\theQA}3}} &
-                                                    \framebox{\matcode{\uniqueid\two@digits{\theQA}4}}
+                                                    \framebox{\matcode{A\uniqueid\two@digits{\theId}1}} &
+                                                    \framebox{\matcode{A\uniqueid\two@digits{\theId}2}} &
+                                                    \framebox{\matcode{A\uniqueid\two@digits{\theId}3}} &
+                                                    \framebox{\matcode{A\uniqueid\two@digits{\theId}4}} &
+                                                    \framebox{\matcode{A\uniqueid\two@digits{\theQA}1}} &
+                                                    \framebox{\matcode{A\uniqueid\two@digits{\theQA}2}} &
+                                                    \framebox{\matcode{A\uniqueid\two@digits{\theQA}3}} &
+                                                    \framebox{\matcode{A\uniqueid\two@digits{\theQA}4}}
                                                     %%%%
                                             \end{tabular}
                                         }
@@ -674,19 +679,19 @@
                                         \begin{tabular}{m{1mm} m{\qrwidth} m{0.15\columnwidth} m{1mm} m{\qrwidth} m{0.15\columnwidth} m{1mm} m{\qrwidth} m{0.15\columnwidth} m{1mm} m{\qrwidth} m{0.15\columnwidth}}
                                                 %%
                                                 \adjustbox{valign=m}{a)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode {\uniqueid\two@digits{\theId}\opta}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\opta}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[m]{2.8cm}\enuna\end{minipage}} &
                                                 %%%%
                                                 \adjustbox{valign=m}{b)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optb}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\optb}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[m]{2.8cm}\enunb\end{minipage}} &
                                                 %%%%
                                                 \adjustbox{valign=m}{c)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optc}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\optc}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[m]{2.8cm}\enunc\end{minipage}} &
                                                 %%%%
                                                 \adjustbox{valign=m}{d)} &
-                                                \adjustbox{valign=m}{\framebox{\matcode{\uniqueid\two@digits{\theId}\optd}}} &
+                                                \adjustbox{valign=m}{\framebox{\matcode{A\uniqueid\two@digits{\theId}\optd}}} &
                                                 \adjustbox{valign=m}{\begin{minipage}[m]{2.8cm}\enund\end{minipage}}\\
                                                 %%%%
                                         \end{tabular}

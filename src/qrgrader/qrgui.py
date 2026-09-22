@@ -601,7 +601,7 @@ class MainWindow(QMainWindow):
             rubric = self.get_current_rubric()
             index = rubric.get_page() if rubric is not None else 0
 
-            self.swik.open(f"{self.dir_publish}{self.current_exam}.pdf", ratio=ratio, index=index)
+            self.swik.open(f"{self.dir_publish}000{self.current_exam:03d}.pdf", ratio=ratio, index=index)
         QTimer.singleShot(50, do)
 
     def update_labels(self):

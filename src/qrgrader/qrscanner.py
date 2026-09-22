@@ -139,7 +139,7 @@ def main():
             new_pdf = pymupdf.open()
             doc = pymupdf.open(dir_generated + pdf_filename)
 
-            exam = pdf_filename[6:9]
+            exam = pdf_filename[0:3]
 
             for page in doc:
 

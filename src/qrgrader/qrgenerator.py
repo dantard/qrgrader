@@ -92,7 +92,7 @@ def main():
                     processes.remove(process)
 
                 print("Creating exam {}{:03d} ({:d} ready)".format(date, i, len(os.listdir(dir_generated))))
-                p = Generator(queue, filename, "{}{:03d}".format(date, i),
+                p = Generator(queue, filename, "{:03d}".format(i),
                               dir_temp_generator=dir_temp_generator,
                               dir_generated=dir_generated,
                               dir_source=source,

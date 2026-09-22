@@ -1,9 +1,9 @@
 class Code:
-    TYPE_A = 0
-    TYPE_P = 1
-    TYPE_Q = 2
-    TYPE_N = 3
-    TYPE_O = 4
+    TYPE_A = "A"
+    TYPE_P = "P"
+    TYPE_Q = "Q"
+    TYPE_N = "N"
+    TYPE_O = "O"
 
     def __init__(self, data, x, y, w, h, page=None, pdf_page=None):
         self.data = data
@@ -15,41 +15,24 @@ class Code:
         self.exam = None
         self.page = page
         self.pdf_page = pdf_page
-        if self.data[0] == "O":
-            self.unique = int(self.data[1:10])
-            self.date = int(self.data[1:7])
-            self.exam = int(self.data[7:10])
-            self.question = int(self.data[10:12])
-            self.type = self.TYPE_O
-        elif self.data[0] == "P":
-            self.unique = int(self.data[1:10])
-            self.date = int(self.data[1:7])
-            self.exam = int(self.data[7:10])
-            self.page = int(self.data[10:12])
-            self.type = self.TYPE_P
-        elif self.data[0] == "Q":
-            self.unique = int(self.data[1:10])
-            self.date = int(self.data[1:7])
-            self.exam = int(self.data[7:10])
-            self.page = int(self.data[10:12])
-            self.type = self.TYPE_Q
-        elif self.data[0] == "N":
-            self.unique = int(self.data[1:10])
-            self.date = int(self.data[1:7])
-            self.exam = int(self.data[7:10])
-            self.number = int(self.data[10:12])
-            self.type = self.TYPE_N
-        else:
-            self.unique = int(self.data[0:9])
-            self.date = int(self.data[0:6])
-            self.exam = int(self.data[6:9])
-            self.question = int(self.data[9:11])
-            self.answer = int(self.data[11])
+        self.type = data[0]
+        self.exam = int(self.data[1:4])
+        self.unique = self.exam
+        self.date = "000"
+
+        if self.type == "O":
+            self.question = int(self.data[4:6])
+        elif self.type == "A":
+            self.question = int(self.data[4:6])
+            self.answer = int(self.data[6])
             if self.answer not in [1, 2, 3, 4]:
-                permut = self.permut[self.question - 1]
-                self.answer = int(permut.index(self.answer)) + 1
-                self.data = self.data[:11] + str(self.answer)
-            self.type = self.TYPE_A
+                p = self.permut[self.question - 1]
+                self.answer = int(p.index(self.answer)) + 1
+                self.data = self.data[:6] + str(self.answer)
+        elif self.data[0] in ["P","Q"]:
+            self.page = int(self.data[4:])
+        elif self.data[0] == "N":
+            self.number = int(self.data[4:])
 
     def set_marked(self, marked):
         self.marked = marked
