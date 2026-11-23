@@ -57,7 +57,8 @@ def main(params=None):
 
         if args.upload is not None:
             for sheet in args.upload:
-                sh.upload(sheet)
+                name = os.path.basename(sheet)
+                sh.upload(sheet, name.replace(".csv", ""))
 
     print("All Done :)")
 

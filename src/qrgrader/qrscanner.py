@@ -385,10 +385,10 @@ def main():
 
         # insert the header rows
         raw.loc[0, 2:] = names
-        raw.loc[1, 2:] = qn
+        raw.loc[1, 2:] = [str(a) for a in qn]
         raw.loc[2, 2:] = ans_letter
-        raw.loc[3, 2:] = ans_value
-        raw.loc[4, 2:] = ans_perc
+        raw.loc[3, 2:] = [str(a) for a in ans_value]
+        raw.loc[4, 2:] = [str(a) for a in ans_perc]
 
         # sort the index and reset it to be sure that the
         # exams are in the right order and the header is on top
