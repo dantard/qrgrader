@@ -97,7 +97,7 @@
         % WITH SCALING
         %\newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\scalebox{\barsize}{\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\psbarcode[transx=-0.3cm,transy=-0.3cm]{#1}{includetext width=0.3 height=0.3 }{azteccode}\end{pspicture}}}
         % WITHOUT SCALING
-        \newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\psbarcode[transx=-0.3cm,transy=-0.3cm]{#1}{includetext width=0.3 height=0.3  }{azteccode}\end{pspicture}}
+        \newcommand\matcode[1]{\wlog{MATCODE:#1}\IfBeginWith{#1}{\#}{}{\zsavepos{QRPOSE,#1}}\begin{pspicture}[shift=-0.24](-.25,-.25)(.4,.4)\psbarcode[transx=-0.3cm,transy=-0.3cm]{#1}{includetext width=0.3 height=0.3  format=compact eclevel=23}{azteccode}\end{pspicture}}
     \fi
 \fi
 
@@ -642,91 +642,37 @@
 }
 
 
-\newcommand{\IDMatrix}[3]{
-\setlength{\extrarowheight}{4mm}
-\begin{center}
-%{\fontfamily{qcr}\selectfont
-\begin{tabular}{ c c c c c c c c c c c}
-& 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 0\\
-#3 \#1 &
-\framebox{\matcode{N#201}} &
-\framebox{\matcode{N#202}} &
-\framebox{\matcode{N#203}} &
-\framebox{\matcode{N#204}} &
-\framebox{\matcode{N#205}} &
-\framebox{\matcode{N#206}} &
-\framebox{\matcode{N#207}} &
-\framebox{\matcode{N#208}} &
-\framebox{\matcode{N#209}} &
-\framebox{\matcode{N#200}}
-\\[5pt]
+\newcommand{\IDMatrix}[4]{%
+  % #1 = framebox width
+  % #2 = code infix
+  % #3 = row label prefix
+  % #4 = number of rows
+  \setlength{\extrarowheight}{4mm}
+  \begin{center}
+  \begin{tabular}{ c c c c c c c c c c c}
+  & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 0\\
+  \IDMatrixRows{#1}{#2}{#3}{#4}{1}%
+  \end{tabular}
+  \end{center}
+}
 
-#3 \#2  &
-\framebox{\matcode{N#211}} &
-\framebox{\matcode{N#212}} &
-\framebox{\matcode{N#213}} &
-\framebox{\matcode{N#214}} &
-\framebox{\matcode{N#215}} &
-\framebox{\matcode{N#216}} &
-\framebox{\matcode{N#217}} &
-\framebox{\matcode{N#218}} &
-\framebox{\matcode{N#219}} &
-\framebox{\matcode{N#210}}\\[5pt]
-
-
-#3 \#3  &
-
-\framebox{\matcode{N#221}} &
-\framebox{\matcode{N#222}} &
-\framebox{\matcode{N#223}} &
-\framebox{\matcode{N#224}} &
-\framebox{\matcode{N#225}} &
-\framebox{\matcode{N#226}} &
-\framebox{\matcode{N#227}} &
-\framebox{\matcode{N#228}} &
-\framebox{\matcode{N#229}} &
-\framebox{\matcode{N#220}}\\[5pt]
-
-
-#3 \#4  &
-\framebox{\matcode{N#231}} &
-\framebox{\matcode{N#232}} &
-\framebox{\matcode{N#233}} &
-\framebox{\matcode{N#234}} &
-\framebox{\matcode{N#235}} &
-\framebox{\matcode{N#236}} &
-\framebox{\matcode{N#237}} &
-\framebox{\matcode{N#238}} &
-\framebox{\matcode{N#239}} &
-\framebox{\matcode{N#230}}\\[5pt]
-
-#3 \#5  &
-\framebox{\matcode{N#241}} &
-\framebox{\matcode{N#242}} &
-\framebox{\matcode{N#243}} &
-\framebox{\matcode{N#244}} &
-\framebox{\matcode{N#245}} &
-\framebox{\matcode{N#246}} &
-\framebox{\matcode{N#247}} &
-\framebox{\matcode{N#248}} &
-\framebox{\matcode{N#249}} &
-\framebox{\matcode{N#240}}\\[5pt]
-
-
-#3 \#6  &
-\framebox{\matcode{N#251}} &
-\framebox{\matcode{N#252}} &
-\framebox{\matcode{N#253}} &
-\framebox{\matcode{N#254}} &
-\framebox{\matcode{N#255}} &
-\framebox{\matcode{N#256}} &
-\framebox{\matcode{N#257}} &
-\framebox{\matcode{N#258}} &
-\framebox{\matcode{N#259}} &
-\framebox{\matcode{N#250}}\\[5pt]
-\end{tabular}
-%}
-\end{center}
+\newcommand{\IDMatrixRows}[5]{%
+  % #1 width, #2 infix, #3 label, #4 total rows, #5 current row
+  #3 \##5 &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax1}} &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax2}} &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax3}} &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax4}} &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax5}} &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax6}} &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax7}} &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax8}} &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax9}} &
+  \framebox{\matcode{N#2\number\numexpr#5-1\relax0}}%
+  \ifnum#5<#4
+    \\[5pt]
+    \IDMatrixRows{#1}{#2}{#3}{#4}{\number\numexpr#5+1\relax}%
+  \fi
 }
 
 \newcommand{\qrgraderpagestyle}[2]{
